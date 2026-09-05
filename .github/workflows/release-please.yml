@@ -18,16 +18,19 @@ on:
     branches: [main]
     paths:
       # Application code + static assets -- an actual shippable change.
-      - "src/**"
+      - "backend/**"
+      - "frontend/**"
       - "**/*.js"
+      - "**/*.jsx"
       - "**/*.mjs"
       - "**/*.cjs"
       - "**/*.html"
       - "**/*.css"
+      - "**/*.prisma"
       # Dependencies and the runtime image go into the release artifact.
       - "package.json"
-      - "package-lock.json"
-      - "Dockerfile"
+      - "**/package-lock.json"
+      - "**/Dockerfile"
       - ".dockerignore"
       - ".containerignore"
       # release-please's own Release PR edits these. Listing them here is what

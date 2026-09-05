@@ -18,6 +18,7 @@
             lolcat
             just
             jq
+            nodejs_24
             # rootless podman stack
             podman
             podman-compose

@@ -19,7 +19,7 @@
   "packages": {
     ".": {
       "release-type": "node",
-      "package-name": "101-app"
+      "package-name": "zero-to-kanban"
     }
   }
 }

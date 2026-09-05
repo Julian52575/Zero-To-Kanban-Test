@@ -8,6 +8,11 @@
 # --- local environment ----------------------------------------------
 .env
 
+# --- node / frontend build output ------------------------------------
+node_modules/
+dist/
+backend/generated/
+
 # --- direnv -------------------------------------------------------
 .direnv/
 

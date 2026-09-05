@@ -1,13 +1,14 @@
-# App stack: a Traefik reverse proxy in front of the Node/Express todo app.
+# App stack: a Traefik reverse proxy in front of a split React/Express app.
 #
-#   http://localhost:8000/           -> app   (Express, frontend + /items API, ./src + ./Dockerfile)
+#   http://localhost:8000/           -> frontend (Vite dev server, ./frontend)
+#   http://localhost:8000/items      -> backend  (Express API, ./backend)
 #   http://localhost:8080/           -> Traefik dashboard (insecure, local only)
 #
 # Traefik discovers routes from each container's `traefik.*` labels through
 # the Podman API socket that the Nix dev shell exposes as $DOCKER_SOCK.
-# `just up` builds the app image on first run; after editing ./src or the
-# Dockerfile run `just rm; just up` to force a clean rebuild
-# (podman-compose's `--build` often misses a changed COPY).
+# `just up` builds images on first run; after editing ./backend, ./frontend or
+# a Dockerfile run `just rm; just up` to force a clean rebuild (podman-compose's
+# `--build` often misses a changed COPY).
 
 services:
   proxy:
@@ -27,19 +28,35 @@ services:
       - "${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock:ro"
     restart: unless-stopped
 
-  app:
-    build:
-      context: .
+  db:
+    image: docker.io/library/postgres:16-alpine
     environment:
-      # sqlite file lives on the named volume below so data survives rebuilds.
-      SQLITE_DB_LOCATION: /data/todo.db
+      POSTGRES_USER: ${POSTGRES_USER:-todo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-todo}
+      POSTGRES_DB: ${POSTGRES_DB:-todo}
     volumes:
-      - todo-data:/data
+      - todo-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-todo}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-todo}:${POSTGRES_PASSWORD:-todo}@db:5432/${POSTGRES_DB:-todo}?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.app.rule=PathPrefix(`/`)
-      - traefik.http.routers.app.priority=1        # catch-all: lowest priority
-      - traefik.http.services.app.loadbalancer.server.port=3000
+      - traefik.http.routers.backend.rule=PathPrefix(`/items`)
+      - traefik.http.routers.backend.priority=10
+      - traefik.http.services.backend.loadbalancer.server.port=3000
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000/items', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
@@ -48,5 +65,15 @@ services:
       retries: 3
       start_period: 5s
 
+  frontend:
+    build:
+      context: ./frontend
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.frontend.rule=PathPrefix(`/`)
+      - traefik.http.routers.frontend.priority=1        # catch-all: lowest priority
+      - traefik.http.services.frontend.loadbalancer.server.port=5173
+    restart: unless-stopped
+
 volumes:
-  todo-data:
+  todo-db-data:
