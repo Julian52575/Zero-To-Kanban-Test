@@ -143,11 +143,36 @@ jobs:
           echo "frontend did not respond on :4173 in time" >&2
           exit 1
 
+  # Runs alongside `backend`/`frontend` (no `needs` between them = parallel
+  # scheduling). Tests the `db` service from docker-compose.yml as-is --
+  # no app code involved, just the container image + healthcheck + connectivity.
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Start the db service and wait for its healthcheck
+        run: docker compose up -d --wait db
+
+      - name: Check the database accepts connections
+        run: docker compose exec -T db pg_isready -U todo -d todo
+
+      - name: Show db logs on failure
+        if: failure()
+        run: docker compose logs db
+
+      - name: Tear down
+        if: always()
+        run: docker compose down --volumes
+
   # Single stable check for the branch ruleset to require.
   # Add a job to `needs` here to make it mandatory to the branch ruleset.
   ci-required:
     if: always()
-    needs: [devshell, backend, frontend]
+    needs: [devshell, backend, frontend, database]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
