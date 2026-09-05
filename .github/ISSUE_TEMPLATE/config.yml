@@ -4,7 +4,7 @@ blank_issues_enabled: false
 contact_links:
   # SECURITY: replace OWNER/REPO with this repository after using the template.
   - name: Security vulnerability
-    url: https://github.com/OWNER/REPO/security/advisories/new
+    url: https://github.com/Julian52575/Zero-To-Kanban/security/advisories/new
     about: Report privately through a security advisory. Never open a public issue for a vulnerability.
 
   # Uncomment and fill in once GitHub Discussions is enabled for the repo:

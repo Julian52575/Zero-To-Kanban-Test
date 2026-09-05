@@ -1,0 +1,91 @@
+
+body:
+  - type: input
+    id: date
+    attributes:
+      label: Date
+      description: Date when the ADR was created.
+      placeholder: YYYY-MM-DD
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What situation requires a decision?
+      placeholder: Slowness observed in MySQL; a proposal was made to migrate to PostgreSQL.
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Options
+      description: What are our options?
+      placeholder: |
+        1. Stay with MySQL and optimize
+        2. Migrate to PostgreSQL
+        3. Migrate to MongoDB
+    validations:
+      required: true
+
+  - type: dropdown
+    id: decision
+    attributes:
+      label: Decision
+      options:
+        - Proposed
+        - Accepted
+        - Rejected
+        - Superseded
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: justification
+    attributes:
+      label: Justification
+      description: Why was this decision taken?
+    validations:
+      required: false
+
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Consequences
+      description: What are the expected consequences, trade-offs, or risks?
+      placeholder: Optimization work required; no migration.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: impact_size
+    attributes:
+      label: Impact size
+      description: Impact on the project as it is in the current state of main.
+      options:
+        - Tiny -- minutes
+        - Small -- hours
+        - Medium -- days
+        - Large -- weeks, needs breaking down
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Add relevant issues, pull requests, documentation, benchmarks, or external resources.
+      placeholder: |
+        - Issue #123
+        - https://example.com/...
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        💡 **Once the decision has been implemented, please come back and leave a final comment summarizing the outcome and close the discussion.**

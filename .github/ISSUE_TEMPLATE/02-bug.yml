@@ -12,6 +12,14 @@ body:
         - label: I can reproduce this on the latest `main`
           required: true
 
+  - type: input
+    attributes:
+      label: ADR discussion
+      description: "Link to the Architecture Decision Record discussion this issue relates to."
+      placeholder: https://github.com/Julian52575/Zero-To-Kanban/discussions/...
+    validations:
+      required: false
+
   - type: textarea
     attributes:
       label: What's wrong
@@ -40,7 +48,7 @@ body:
   - type: textarea
     attributes:
       label: Environment
-      description: ref to find the Flake.nix that built the faulting project:  `git rev-parse HEAD`.
+      description: "ref to find the Flake.nix that built the faulting project:  `git rev-parse HEAD`."
       render: shell
     validations:
       required: true
@@ -52,3 +60,9 @@ body:
       render: shell
     validations:
       required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        💡 A link to an "Accepted" [Architecture Decision Records discussion](https://github.com/Julian52575/Zero-To-Kanban/discussions/categories/architecture-decision-records?discussions_q=) should be provided for the issue to be started working on. You are free to create a placeholder issue without this link.

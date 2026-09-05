@@ -1,0 +1,290 @@
+name: adr-discussion-sync
+
+# When a GitHub Discussion in the "Architecture Decision Records" category is
+# CLOSED, mirror the whole discussion (body + every comment + the original
+# poster) into docs/adr/<discussion title>.md and raise a pull request that
+# asks a maintainer to merge it.
+#
+# The model is the same as release-please:
+#   * one long-lived branch  -- `adr-discussion-update`
+#   * one long-lived PR against the default branch
+#   * every close APPENDS to that branch/PR; nothing reaches main until a
+#     maintainer merges the PR.
+#
+# Re-opening and then re-closing a discussion does NOT rewrite the existing
+# file. Each close appends a fresh "## Sync -- closed <timestamp>" section that
+# captures the discussion and its comments as they stood at that moment, so the
+# record keeps its own history.
+#
+# The `discussion` event only ever fires on the repository's default branch,
+# so this workflow always runs against main.
+
+on:
+  discussion:
+    types: [closed]
+
+permissions:
+  contents: write # push the adr-discussion-update branch
+  discussions: read # read the discussion body + comments over GraphQL
+  pull-requests: write # open / update the sync PR
+
+# Serialize: every run mutates the same branch and the same PR.
+concurrency:
+  group: adr-discussion-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    # Only discussions filed under the ADR category.
+    if: github.event.discussion.category.name == 'Architecture Decision Records'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # A PAT or GitHub App token is only needed if either
+          #   * branch protection blocks the built-in token, or
+          #   * the org/repo disables "Allow GitHub Actions to create and
+          #     approve pull requests".
+          # Falls back to GITHUB_TOKEN when the secret is not set.
+          token: ${{ secrets.ADR_SYNC_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Prepare the adr-discussion-update branch
+        env:
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin "$BASE_BRANCH"
+
+          BRANCH=adr-discussion-update
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$BRANCH"
+            git checkout -B "$BRANCH" "origin/$BRANCH"
+            # Keep the PR mergeable: fold in whatever has landed on the base
+            # branch since the PR was opened. The branch only ever touches
+            # docs/adr/, so this stays conflict-free in practice.
+            git merge --no-edit "origin/$BASE_BRANCH"
+          else
+            git checkout -B "$BRANCH" "origin/$BASE_BRANCH"
+          fi
+
+      - name: Render the discussion into docs/adr
+        id: render
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ADR_SYNC_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const number = context.payload.discussion.number;
+
+            // ---- pull the whole discussion; comments are paginated ----
+            const query = `
+              query ($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+                repository(owner: $owner, name: $repo) {
+                  discussion(number: $number) {
+                    number
+                    title
+                    url
+                    body
+                    createdAt
+                    category { name }
+                    author { login }
+                    comments(first: 50, after: $cursor) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes {
+                        body
+                        createdAt
+                        author { login }
+                        replies(first: 100) {
+                          nodes { body createdAt author { login } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }`;
+
+            let cursor = null;
+            let discussion = null;
+            const comments = [];
+            do {
+              const res = await github.graphql(query, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                number,
+                cursor,
+              });
+              discussion = res.repository.discussion;
+              comments.push(...discussion.comments.nodes);
+              cursor = discussion.comments.pageInfo.hasNextPage
+                ? discussion.comments.pageInfo.endCursor
+                : null;
+            } while (cursor);
+
+            const who = (a) => (a && a.login ? `@${a.login}` : '@ghost');
+            const when = (iso) =>
+              new Date(iso).toISOString().replace('T', ' ').slice(0, 16) + 'Z';
+
+            // ---- target file: docs/adr/<discussion title>.md ----
+            const illegal = /[\/\\?%*:|"<>]/g; // path / FS unsafe characters
+            const safeTitle =
+              discussion.title
+                .trim()
+                .replace(illegal, '-')
+                .replace(/\s+/g, '-') // no spaces in the filename
+                .replace(/-+/g, '-')
+                .replace(/^[-.]+/, '')
+                .replace(/[-.]+$/, '')
+                .slice(0, 200) || `discussion-${number}`;
+            const dir = 'docs/adr';
+            const file = path.join(dir, `${safeTitle}.md`);
+            fs.mkdirSync(dir, { recursive: true });
+
+            const existed = fs.existsSync(file);
+
+            // ---- header, written once, never rewritten afterwards ----
+            let header = '';
+            if (!existed) {
+              header += `# ${discussion.title}\n\n`;
+              header += `- **Discussion:** [#${discussion.number}](${discussion.url})\n`;
+              header += `- **Category:** ${discussion.category.name}\n`;
+              header += `- **Original poster:** ${who(discussion.author)}\n`;
+              header += `- **Opened:** ${when(discussion.createdAt)}\n\n`;
+              header += `<!-- adr-discussion-sync appends one section per close below; existing sections are never rewritten -->\n`;
+            }
+
+            // ---- one appended section per close ----
+            const out = [];
+            out.push('');
+            out.push(`## Sync -- closed ${when(new Date().toISOString())}`);
+            out.push('');
+            out.push('### Discussion');
+            out.push('');
+            out.push(discussion.body.trim() || '_(empty body)_');
+            out.push('');
+            out.push('### Comments');
+            out.push('');
+            if (comments.length === 0) {
+              out.push('_No comments._');
+              out.push('');
+            } else {
+              for (const c of comments) {
+                out.push(`#### ${who(c.author)} -- ${when(c.createdAt)}`);
+                out.push('');
+                out.push(c.body.trim() || '_(empty comment)_');
+                out.push('');
+                for (const r of c.replies.nodes) {
+                  out.push(`> **${who(r.author)}** -- ${when(r.createdAt)}`);
+                  out.push('>');
+                  for (const line of (r.body.trim() || '_(empty reply)_').split('\n')) {
+                    out.push(`> ${line}`);
+                  }
+                  out.push('');
+                }
+              }
+            }
+            // Poster name lives at the bottom of the document, as requested.
+            out.push('### Poster');
+            out.push('');
+            out.push(
+              `Originally posted by ${who(discussion.author)} on ${when(discussion.createdAt)}.`,
+            );
+            out.push('');
+
+            fs.appendFileSync(file, header + out.join('\n'));
+
+            core.setOutput('file', file);
+            core.setOutput('status', existed ? 'updated' : 'new');
+            core.setOutput('title', discussion.title);
+
+      - name: Commit, push, and open / update the PR
+        uses: actions/github-script@v7
+        env:
+          DOC_TITLE: ${{ steps.render.outputs.title }}
+          DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
+        with:
+          github-token: ${{ secrets.ADR_SYNC_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const { execSync } = require('child_process');
+            const sh = (c) => execSync(c, { encoding: 'utf8' }).trim();
+
+            const BRANCH = 'adr-discussion-update';
+            const BASE = context.payload.repository.default_branch;
+
+            sh('git add docs/adr');
+            if (sh('git status --porcelain docs/adr') === '') {
+              core.info('Nothing changed -- discussion already in sync.');
+              return;
+            }
+
+            const title = process.env.DOC_TITLE;
+            const num = process.env.DISCUSSION_NUMBER;
+            sh(
+              `git commit -m ${JSON.stringify(`docs(adr): sync "${title}" (#${num})`)}`,
+            );
+            sh(`git push --force-with-lease origin HEAD:${BRANCH}`);
+
+            // ---- PR body: every new / updated doc on the branch vs. base ----
+            const diff = sh(
+              `git diff --name-status origin/${BASE}...HEAD -- docs/adr/`,
+            );
+            const created = [];
+            const updated = [];
+            for (const row of diff.split('\n').filter(Boolean)) {
+              const [status, ...rest] = row.split('\t');
+              const f = rest.join('\t');
+              if (status === 'A') created.push(f);
+              else updated.push(f); // M / R / C -> treat as updated
+            }
+            const bullets = (arr) =>
+              arr.length ? arr.map((f) => `- \`${f}\``).join('\n') : '_None._';
+
+            const body = [
+              'Automated save of closed **Architecture Decision Records** discussions into `docs/adr/`.',
+              '',
+              `Merge this PR to publish the records to \`${BASE}\`. Each further close appends here until it is merged.`,
+              '',
+              '### New documents',
+              bullets(created),
+              '',
+              '### Updated documents',
+              bullets(updated),
+            ].join('\n');
+
+            const prTitle =
+              'docs(adr): 🤖 saving closed Architecture Decision Records discussions';
+
+            const { data: open } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${BRANCH}`,
+            });
+
+            if (open.length) {
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: open[0].number,
+                title: prTitle,
+                body,
+              });
+              core.info(`Updated PR #${open[0].number}`);
+            } else {
+              const { data: pr } = await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                base: BASE,
+                head: BRANCH,
+                title: prTitle,
+                body,
+              });
+              core.info(`Opened PR #${pr.number}`);
+            }

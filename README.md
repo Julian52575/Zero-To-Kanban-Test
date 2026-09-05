@@ -1,8 +1,14 @@
-<!-- swap
-     `Julian52575/Big-3-Governed-Template`
-     for your own owner/repo.
-     -->
-[![OpenSSF Scorecard](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FJulian52575%2FBig-3-Governed-Template%2Fmain%2F.readme-badges%2Fscorecard-badge.json)](.readme-badges/scorecard-results.json)
+# Zero-To-Kaban
+
+A fork of a simple To-Do list.  
+
+`cp .env.example .env` and update .env.
+Then run simply with `nix develop -c just up`, install steps are below.
+
+[![OpenSSF Scorecard](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FJulian52575%2FZero-To-Kanban%2Fmain%2F.readme-badges%2Fscorecard-badge.json)](.readme-badges/scorecard-results.json)
+
+> [!NOTE]
+> Bellow is the [used template](https://github.com/Julian52575/Big-3-Governed-Template)'s README:
 
 # Nix + Just + Rootless Podman — The Big 3, governed
 

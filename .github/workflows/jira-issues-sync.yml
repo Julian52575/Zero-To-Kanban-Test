@@ -1,0 +1,244 @@
+name: Sync GitHub Issues to Jira
+
+# Two-way-aware sync (GitHub side). Keeps a Jira task linked to each GitHub
+# issue, and mirrors create / close / reopen across.
+#
+# How the two sides stay linked:
+#   - When the Jira issue is created, its key is written back into the
+#     GitHub issue body as a hidden marker: <!-- jira-issue: PROJ-123 -->
+#   - That marker travels with the issue in every future GitHub webhook
+#     payload (closed/reopened), so later steps can read it back out
+#     without needing external storage.
+#   - The Jira issue's description stores a link to the GitHub issue, which
+#     is what the Jira-side automation rules key off of.
+
+on:
+  issues:
+    types: [opened, closed, reopened]
+  repository_dispatch:
+    types: [jira_task_created]
+
+permissions:
+  issues: write
+
+env:
+  # --- Non-sensitive config: fine as plain env vars, edit for your project ---
+  JIRA_PROJECT_KEY: "ZTK"                            # your Jira project key
+  JIRA_ISSUE_TYPE: "Task"                            # must be a valid issue type for the project
+  # Transition target names — must match the workflow step names used in
+  # your Jira project (edit if yours differ, e.g. "Closed" instead of "Done").
+  JIRA_DONE_STATUS: "Terminé"
+  JIRA_REOPEN_STATUS: "À faire"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      # --- Everything here is a repo secret, not a plain env var, because
+      # each reveals something about your Jira tenant/credentials. Add all
+      # three under Settings -> Secrets and variables -> Actions. ---
+      JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}     # e.g. https://acme.atlassian.net
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}           # Atlassian account email used to generate the API token
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}   # https://id.atlassian.com/manage-profile/security/api-tokens
+      ISSUE_TITLE: ${{ github.event.issue.title }}
+      ISSUE_BODY: ${{ github.event.issue.body }}
+      ISSUE_URL: ${{ github.event.issue.html_url }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+ 
+    steps:
+      # ---------------------------------------------------------------
+      # Strip any trailing slash from JIRA_BASE_URL so a mistyped secret
+      # (e.g. "https://acme.atlassian.net/") doesn't produce a
+      # double-slash URL that Jira responds to with a 302 redirect
+      # instead of the actual API response.
+      # ---------------------------------------------------------------
+      - name: Normalize Jira base URL
+        run: echo "JIRA_BASE_URL=${JIRA_BASE_URL%/}" >> "$GITHUB_ENV"
+ 
+      # ---------------------------------------------------------------
+      # ISSUE OPENED -> create the Jira task and link the two records
+      #
+      # Skipped when the issue body already carries a "jira-issue" marker
+      # — that means this issue was itself created by the step below (in
+      # response to a Jira task being created), so it's already linked and
+      # creating a second Jira task here would just duplicate it.
+      # ---------------------------------------------------------------
+      - name: Create Jira issue
+        if: github.event.action == 'opened' && !contains(github.event.issue.body, '<!-- jira-issue:')
+        run: |
+          DESCRIPTION=$(cat <<EOF
+          ${ISSUE_BODY}
+ 
+          ---
+          Created from GitHub issue #${ISSUE_NUMBER}: ${ISSUE_URL}
+          EOF
+          )
+ 
+          PAYLOAD=$(jq -n \
+            --arg summary "$ISSUE_TITLE" \
+            --arg description "$DESCRIPTION" \
+            --arg project "$JIRA_PROJECT_KEY" \
+            --arg issuetype "$JIRA_ISSUE_TYPE" \
+            '{
+              fields: {
+                project: { key: $project },
+                summary: $summary,
+                issuetype: { name: $issuetype },
+                description: {
+                  type: "doc", version: 1,
+                  content: [ { type: "paragraph", content: [ { type: "text", text: $description } ] } ]
+                }
+              }
+            }')
+ 
+          RESPONSE=$(curl -sS -w "\n%{http_code}" \
+            --request POST --url "${JIRA_BASE_URL}/rest/api/3/issue" \
+            --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
+            --header "Content-Type: application/json" --data "$PAYLOAD")
+ 
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "Jira response ($HTTP_STATUS): $BODY"
+          [ "$HTTP_STATUS" -lt 300 ] || { echo "::error::Failed to create Jira issue"; exit 1; }
+ 
+          JIRA_KEY=$(echo "$BODY" | jq -r '.key')
+          echo "JIRA_KEY=$JIRA_KEY" >> "$GITHUB_ENV"
+ 
+          # Stamp the Jira key into the GitHub issue body (hidden marker) so
+          # later events (closed/reopened) can recover it.
+          NEW_BODY=$(printf '%s\n\n<!-- jira-issue: %s -->' "$ISSUE_BODY" "$JIRA_KEY")
+          gh api "repos/${REPO}/issues/${ISSUE_NUMBER}" -X PATCH -f body="$NEW_BODY"
+ 
+          gh issue comment "$ISSUE_NUMBER" --repo "$REPO" \
+            --body "Tracked in Jira: ${JIRA_KEY}"
+ 
+      # ---------------------------------------------------------------
+      # JIRA TASK CREATED -> create the matching GitHub issue
+      #
+      # Triggered by a repository_dispatch call ("jira_task_created") that
+      # a Jira Automation rule sends when a new Task is created — see
+      # JIRA_AUTOMATION_SETUP.md. The Jira key is stamped into the body as
+      # the same hidden marker used everywhere else, so this issue is
+      # already linked from the moment it exists — and so the "Create Jira
+      # issue" step above skips it when GitHub's own "opened" event fires
+      # for it a moment later, avoiding a duplicate Jira task.
+      # ---------------------------------------------------------------
+      - name: Create GitHub issue from Jira task
+        if: github.event_name == 'repository_dispatch' && github.event.action == 'jira_task_created'
+        env:
+          JIRA_KEY: ${{ github.event.client_payload.jira_key }}
+          JIRA_SUMMARY: ${{ github.event.client_payload.summary }}
+          JIRA_DESCRIPTION: ${{ github.event.client_payload.description }}
+        run: |
+          if [ -z "$JIRA_KEY" ]; then
+            echo "::error::repository_dispatch payload is missing jira_key — check the Jira Automation rule's request body."
+            exit 1
+          fi
+
+          EXISTING_COUNT=$(gh search issues --repo "$REPO" --json number --jq 'length' \
+            -- "\"Created from Jira: ${JIRA_KEY}\" in:body" 2>/dev/null || echo 0)
+          if [ "$EXISTING_COUNT" -gt 0 ] 2>/dev/null; then
+            echo "::warning::A GitHub issue already exists for Jira task $JIRA_KEY — skipping creation to avoid a duplicate."
+            exit 0
+          fi
+
+          BODY=$(printf '%s\n\n---\nCreated from Jira: %s\n\n<!-- jira-issue: %s -->' \
+            "$JIRA_DESCRIPTION" "$JIRA_KEY" "$JIRA_KEY")
+          
+          # Label lets the dev team filter Jira-originated issues from
+          # ones opened directly on GitHub.
+          ISSUE_URL=$(gh issue create --repo "$REPO" \
+            --title "$JIRA_SUMMARY" \
+            --body "$BODY" \
+            --label "jira-auto")
+ 
+          echo "Created $ISSUE_URL"
+          ISSUE_NUMBER=$(basename "$ISSUE_URL")
+ 
+          NOTE_TEXT="------------------------------\nThis task was automatically linked to a new GitHub issue by GitHub: #${ISSUE_NUMBER} (${ISSUE_URL})"
+          CURRENT_DESC=$(curl -sS --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
+            "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}?fields=description" | jq -c '.fields.description')
+ 
+          if [ "$CURRENT_DESC" = "null" ] || [ -z "$CURRENT_DESC" ]; then
+            CURRENT_DESC='{"type":"doc","version":1,"content":[]}'
+          fi
+ 
+          NEW_DESC=$(echo "$CURRENT_DESC" | jq --arg text "$NOTE_TEXT" \
+            '.content += [ { type: "paragraph", content: [ { type: "text", text: $text } ] } ]')
+ 
+          curl -sS --request PUT --url "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}" \
+            --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" --header "Content-Type: application/json" \
+            --data "$(jq -n --argjson desc "$NEW_DESC" '{ fields: { description: $desc } }')" 
+
+      # ---------------------------------------------------------------
+      # Shared helper step for closed/reopened: pull the Jira key back
+      # out of the issue body's hidden marker.
+      # ---------------------------------------------------------------
+      - name: Extract linked Jira key
+        if: github.event_name == 'issues' && github.event.action != 'opened'
+        run: |
+          JIRA_KEY=$(echo "$ISSUE_BODY" | grep -oP '(?<=<!-- jira-issue: )[A-Z][A-Z0-9]+-[0-9]+(?= -->)' || true)
+          if [ -z "$JIRA_KEY" ]; then
+            echo "::warning::No linked Jira issue found in this GitHub issue's body — skipping."
+            echo "JIRA_KEY=" >> "$GITHUB_ENV"
+          else
+            echo "JIRA_KEY=$JIRA_KEY" >> "$GITHUB_ENV"
+          fi
+ 
+      # ---------------------------------------------------------------
+      # ISSUE CLOSED -> transition the Jira task to Done
+      # ---------------------------------------------------------------
+      - name: Transition Jira issue to Done
+        if: github.event.action == 'closed' && env.JIRA_KEY != ''
+        run: |
+          TRANSITIONS=$(curl -sS --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
+            "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/transitions")
+          TRANSITION_ID=$(echo "$TRANSITIONS" | jq -r --arg name "$JIRA_DONE_STATUS" \
+            '.transitions[] | select(.name == $name) | .id' | head -n1)
+ 
+          if [ -z "$TRANSITION_ID" ]; then
+            echo "::warning::No transition named '$JIRA_DONE_STATUS' found on $JIRA_KEY — check JIRA_DONE_STATUS matches your workflow."
+            exit 0
+          fi
+ 
+          curl -sS --request POST --url "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/transitions" \
+            --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" --header "Content-Type: application/json" \
+            --data "$(jq -n --arg id "$TRANSITION_ID" '{transition: {id: $id}}')"
+ 
+          # Note on the Jira issue that this was an automated action, not a
+          # person manually moving the card.
+          COMMENT_TEXT="This issue was automatically transitioned to \"${JIRA_DONE_STATUS}\" by GitHub, following the linked GitHub issue being closed."
+          curl -sS --request POST --url "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/comment" \
+            --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" --header "Content-Type: application/json" \
+            --data "$(jq -n --arg text "$COMMENT_TEXT" \
+              '{ body: { type: "doc", version: 1, content: [ { type: "paragraph", content: [ { type: "text", text: $text } ] } ] } }')"
+ 
+      # ---------------------------------------------------------------
+      # ISSUE REOPENED -> transition the Jira task back to To Do
+      # ---------------------------------------------------------------
+      - name: Transition Jira issue to reopened status
+        if: github.event.action == 'reopened' && env.JIRA_KEY != ''
+        run: |
+          TRANSITIONS=$(curl -sS --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
+            "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/transitions")
+          TRANSITION_ID=$(echo "$TRANSITIONS" | jq -r --arg name "$JIRA_REOPEN_STATUS" \
+            '.transitions[] | select(.name == $name) | .id' | head -n1)
+ 
+          if [ -z "$TRANSITION_ID" ]; then
+            echo "::warning::No transition named '$JIRA_REOPEN_STATUS' found on $JIRA_KEY — check JIRA_REOPEN_STATUS matches your workflow."
+            exit 0
+          fi
+ 
+          curl -sS --request POST --url "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/transitions" \
+            --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" --header "Content-Type: application/json" \
+            --data "$(jq -n --arg id "$TRANSITION_ID" '{transition: {id: $id}}')"
+ 
+          # Note on the Jira issue that this was an automated action, not a
+          # person manually moving the card.
+          COMMENT_TEXT="This issue was automatically transitioned to \"${JIRA_REOPEN_STATUS}\" by GitHub, following the linked GitHub issue being reopened."
+          curl -sS --request POST --url "${JIRA_BASE_URL}/rest/api/3/issue/${JIRA_KEY}/comment" \
+            --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" --header "Content-Type: application/json" \
+            --data "$(jq -n --arg text "$COMMENT_TEXT" \
+              '{ body: { type: "doc", version: 1, content: [ { type: "paragraph", content: [ { type: "text", text: $text } ] } ] } }')"
