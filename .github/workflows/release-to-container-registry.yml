@@ -26,4 +26,4 @@ jobs:
         with:
           context: image/
           push: true
-          tags: ghcr.io/Julian52575/Zero-To-Kanban-Test
+          tags: ghcr.io/julian52575/zero-to-kanban-test
