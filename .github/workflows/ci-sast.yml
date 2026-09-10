@@ -284,12 +284,15 @@ jobs:
 
       - name: Commit the refreshed reports to main
         run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .sast/report
           if git diff --cached --quiet; then
             echo "SAST reports unchanged."
             exit 0
           fi
-          git commit -m "chore(sast reports): refresh SAST reports [skip ci]"
+          # [skip ci] so this push starts no further ci / ci-sast run.
+          git commit -m "ci(sast): refresh SAST reports [skip ci]"
           for attempt in 1 2 3; do
             git push origin HEAD:main && exit 0
             echo "push rejected (attempt ${attempt}); rebasing onto main"
