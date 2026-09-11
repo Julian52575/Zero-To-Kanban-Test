@@ -4,7 +4,7 @@
 - **Category:** Architecture Decision Records
 - **Original poster:** @Julian52575
 - **Opened:** 2026-09-11 08:06Z
-- **Closed:** 2026-09-11 09:25Z
+- **Closed:** 2026-09-11 09:29Z
 
 ### Discussion
 
@@ -170,6 +170,14 @@ Either update the document and close discussion OR 'Close with comment' with `/c
 /commit adr-comment-over-body
 
 #### @Julian52575 -- 2026-09-11 09:25Z
+
+/commit adr-comment-over-body
+
+#### @github-actions -- 2026-09-11 09:25Z
+
+This discussion was commited into adr-comment-over-body: [c2b3865](https://github.com/Julian52575/Zero-To-Kanban-Test/commit/c2b3865583b2ee9fac74c0fa90e36a8d052ff3e1)
+
+#### @Julian52575 -- 2026-09-11 09:28Z
 
 /commit adr-comment-over-body
 
