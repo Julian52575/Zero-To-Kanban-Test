@@ -196,7 +196,13 @@ jobs:
             out.push('');
             out.push(discussion.body.trim() || '_(empty body)_');
             out.push('');
-            out.push('### Comments');
+            out.push('### Poster');
+            out.push('');
+            out.push(
+              `Originally posted by ${who(discussion.author)} on ${when(discussion.createdAt)}.`,
+            );
+            out.push('---');
+            out.push('## Comments');
             out.push('');
             if (comments.length === 0) {
               out.push('_No comments._');
@@ -217,11 +223,6 @@ jobs:
                 }
               }
             }
-            out.push('### Poster');
-            out.push('');
-            out.push(
-              `Originally posted by ${who(discussion.author)} on ${when(discussion.createdAt)}.`,
-            );
             out.push('');
 
             fs.writeFileSync(file, out.join('\n'));
@@ -239,7 +240,7 @@ jobs:
           set -euo pipefail
           git add docs/adr
           if git status --porcelain docs/adr | grep -q .; then
-            git commit -m "docs(adr): sync \"$DOC_TITLE\" (#$DISCUSSION_NUMBER)"
+            git commit -m "docs(adr): accepted adr \"$DOC_TITLE\" (#$DISCUSSION_NUMBER)"
             git push origin "HEAD:$TARGET_BRANCH"
           else
             echo "Nothing changed -- discussion already in sync."
