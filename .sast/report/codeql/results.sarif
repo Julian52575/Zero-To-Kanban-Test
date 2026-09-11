@@ -2981,7 +2981,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/index.js",
+                      "uri": "backend/src/routes/deleteItem.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 0
                     }
@@ -3010,7 +3010,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/routes/addItem.js",
+                      "uri": "backend/src/persistence/index.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 1
                     }
@@ -3039,7 +3039,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/persistence/index.js",
+                      "uri": "backend/src/routes/addItem.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 2
                     }
@@ -3068,7 +3068,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/routes/deleteItem.js",
+                      "uri": "backend/src/index.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 3
                     }
@@ -3244,7 +3244,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/index.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 0
+                      "index": 3
                     }
                   }
                 }
@@ -3270,7 +3270,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/persistence/index.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 2
+                      "index": 1
                     }
                   }
                 }
@@ -3296,7 +3296,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/routes/addItem.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 1
+                      "index": 2
                     }
                   }
                 }
@@ -3348,7 +3348,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/routes/deleteItem.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 3
+                      "index": 0
                     }
                   }
                 }
@@ -3398,7 +3398,7 @@
                 "text": ""
               },
               "level": "none",
-              "timeUtc": "2026-09-10T16:10:46.305Z",
+              "timeUtc": "2026-09-11T08:05:30.891Z",
               "descriptor": {
                 "id": "codeql-action/overlay-disabled",
                 "index": 1
@@ -3420,28 +3420,28 @@
       "artifacts": [
         {
           "location": {
-            "uri": "backend/src/index.js",
+            "uri": "backend/src/routes/deleteItem.js",
             "uriBaseId": "%SRCROOT%",
             "index": 0
           }
         },
         {
           "location": {
-            "uri": "backend/src/routes/addItem.js",
+            "uri": "backend/src/persistence/index.js",
             "uriBaseId": "%SRCROOT%",
             "index": 1
           }
         },
         {
           "location": {
-            "uri": "backend/src/persistence/index.js",
+            "uri": "backend/src/routes/addItem.js",
             "uriBaseId": "%SRCROOT%",
             "index": 2
           }
         },
         {
           "location": {
-            "uri": "backend/src/routes/deleteItem.js",
+            "uri": "backend/src/index.js",
             "uriBaseId": "%SRCROOT%",
             "index": 3
           }
@@ -3523,7 +3523,7 @@
         "codeqlConfigSummary": {
           "disableDefaultQueries": false
         },
-        "jobRunUuid": "5c166e2a-217d-4f36-8c19-215ab64062a0"
+        "jobRunUuid": "1e8fdd8e-714b-469b-8310-466435bdd244"
       }
     }
   ]
