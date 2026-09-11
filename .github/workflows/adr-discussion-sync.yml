@@ -4,11 +4,16 @@ name: adr-discussion-sync
 # CLOSED:
 #
 #   * If the decision is not "Accepted", do nothing.
-#   * If the `branch` field is empty, comment asking for it and reopen the
-#     discussion so it can be closed again once filled in.
-#   * If the `branch` field is set, render the discussion (body + comments)
-#     into docs/adr/<discussion title>.md and commit it straight to that
-#     branch.
+#   * The target branch is normally the `branch` field in the discussion body,
+#     but a failsafe lets anyone closing the discussion override it: if the
+#     discussion is closed with a comment starting with "/commit <branch>
+#     <details>", that branch wins over the body field. This lets someone who
+#     isn't the author close the discussion quickly without editing the post.
+#   * If no branch can be found (body field empty, no /commit override), or
+#     the resolved branch name is not a valid git branch name, comment asking
+#     for a valid one and reopen the discussion so it can be closed again.
+#   * Otherwise render the discussion (body + comments) into
+#     docs/adr/<discussion title>.md and commit it straight to that branch.
 
 on:
   discussion:
@@ -40,10 +45,11 @@ jobs:
           # Falls back to GITHUB_TOKEN when the secret is not set.
           token: ${{ secrets.ADR_SYNC_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Parse the ADR form fields
+      - name: Parse the ADR form fields and the /commit failsafe
         id: fields
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.ADR_SYNC_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const body = context.payload.discussion.body || '';
 
@@ -57,19 +63,80 @@ jobs:
             };
 
             const decision = field('Decision');
-            const branch = field('Branch');
+            const bodyBranch = field('Branch');
+
+            // Failsafe: whoever closes the discussion can override the branch
+            // with "Close with comment" + "/commit <branch_name> <details>",
+            // without needing to be the author or edit the discussion body.
+            // The most recent comment is the one that closed the discussion.
+            const { repository } = await github.graphql(
+              `query ($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  discussion(number: $number) {
+                    comments(last: 1) {
+                      nodes { body }
+                    }
+                  }
+                }
+              }`,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                number: context.payload.discussion.number,
+              },
+            );
+            const lastComment = repository.discussion.comments.nodes[0];
+            const commitMatch = (lastComment ? lastComment.body : '')
+              .trim()
+              .match(/^\/commit\s+(\S+)/);
+            const commentBranch = commitMatch ? commitMatch[1] : '';
+
+            const branch = commentBranch || bodyBranch;
+
+            // Minimal subset of git's ref-name rules (see check-ref-format).
+            const isValidBranchName = (name) =>
+              !!name &&
+              name.length <= 255 &&
+              !/\s/.test(name) &&
+              !name.startsWith('/') &&
+              !name.endsWith('/') &&
+              !name.startsWith('-') &&
+              !name.includes('..') &&
+              !name.includes('//') &&
+              !name.includes('@{') &&
+              name !== '@' &&
+              !name.endsWith('.') &&
+              !name.endsWith('.lock') &&
+              !/[\x00-\x1f\x7f~^:?*\[\\]/.test(name);
+
+            let status;
+            if (!branch) status = 'missing';
+            else if (!isValidBranchName(branch)) status = 'invalid';
+            else status = 'ok';
 
             core.setOutput('decision', decision);
             core.setOutput('branch', branch);
-            core.info(`decision="${decision}" branch="${branch}"`);
+            core.setOutput('status', status);
+            core.info(
+              `decision="${decision}" branch="${branch}" status="${status}" source="${commentBranch ? '/commit comment' : 'body field'}"`,
+            );
 
-      - name: Ask for the branch and reopen the discussion
-        if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.branch == ''
+      - name: Ask for a valid branch and reopen the discussion
+        if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.status != 'ok'
         uses: actions/github-script@v7
+        env:
+          STATUS: ${{ steps.fields.outputs.status }}
+          BRANCH: ${{ steps.fields.outputs.branch }}
         with:
           github-token: ${{ secrets.ADR_SYNC_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const discussionId = context.payload.discussion.node_id;
+            const hint =
+              "Either update the document and close discussion OR 'Close with comment' with '/commit <branch_name> <details>'.";
+            const message =
+              process.env.STATUS === 'invalid'
+                ? `This discussion cannot be closed yet. Branch '${process.env.BRANCH}' is invalid.\n${hint}`
+                : `This discussion cannot be closed yet. Please specify a branch so I can commit the markdown document to it.\n${hint}`;
 
             await github.graphql(
               `mutation ($discussionId: ID!, $body: String!) {
@@ -77,10 +144,7 @@ jobs:
                   comment { id }
                 }
               }`,
-              {
-                discussionId,
-                body: "This discussion cannot be closed yet. Please fill the `branch` field so I can commit the markdown document to it.",
-              },
+              { discussionId, body: message },
             );
 
             await github.graphql(
@@ -93,7 +157,7 @@ jobs:
             );
 
       - name: Check out the target branch
-        if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.branch != ''
+        if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.status == 'ok'
         env:
           TARGET_BRANCH: ${{ steps.fields.outputs.branch }}
         run: |
@@ -110,7 +174,7 @@ jobs:
 
       - name: Render the discussion into docs/adr
         id: render
-        if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.branch != ''
+        if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.status == 'ok'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.ADR_SYNC_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -231,7 +295,7 @@ jobs:
             core.setOutput('title', discussion.title);
 
       - name: Commit and push to the target branch
-        if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.branch != ''
+        if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.status == 'ok'
         env:
           TARGET_BRANCH: ${{ steps.fields.outputs.branch }}
           DOC_TITLE: ${{ steps.render.outputs.title }}
