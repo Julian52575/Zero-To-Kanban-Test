@@ -4,7 +4,7 @@
 - **Category:** Architecture Decision Records
 - **Original poster:** @Julian52575
 - **Opened:** 2026-09-11 08:06Z
-- **Closed:** 2026-09-11 08:31Z
+- **Closed:** 2026-09-11 08:33Z
 
 ### Discussion
 
@@ -44,9 +44,6 @@ Tiny -- minutes
 
 _No response_
 
-### Poster
-
-Originally posted by @Julian52575 on 2026-09-11 08:06Z.
 ---
 ## Comments
 
@@ -94,6 +91,10 @@ Either update the document and close discussion OR 'Close with comment' with '/c
 /commit
 
 #### @Julian52575 -- 2026-09-11 08:31Z
+
+/commit adr-comment-over-body
+
+#### @Julian52575 -- 2026-09-11 08:33Z
 
 /commit adr-comment-over-body
 
