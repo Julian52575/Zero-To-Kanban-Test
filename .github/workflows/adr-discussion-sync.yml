@@ -53,13 +53,22 @@ jobs:
           script: |
             const body = context.payload.discussion.body || '';
 
-            // Discussion forms render each field as "### <Label>\n\n<value>\n\n".
+            // Discussion forms render each field as its own "### <Label>"
+            // heading line, followed by the value, up to the next "### "
+            // heading. Anchor on the heading actually starting a line (`^`
+            // with the `m` flag) so a value that happens to contain the
+            // literal text "### <NextLabel>" can't be mistaken for the next
+            // field and swallow it whole. An unanswered optional field
+            // renders as the literal placeholder "_No response_" -- treat
+            // that as empty rather than as a real value.
             const field = (label) => {
               const re = new RegExp(
-                `### ${label}\\r?\\n\\r?\\n([\\s\\S]*?)(?=\\r?\\n### |$)`,
+                `^### ${label}\\s*\\r?\\n([\\s\\S]*?)(?=\\r?\\n### |$)`,
+                'm',
               );
               const m = body.match(re);
-              return m ? m[1].trim() : '';
+              const value = m ? m[1].trim() : '';
+              return value === '_No response_' ? '' : value;
             };
 
             const decision = field('Decision');
@@ -132,10 +141,10 @@ jobs:
           script: |
             const discussionId = context.payload.discussion.node_id;
             const hint =
-              "Either update the document and close discussion OR 'Close with comment' with '/commit <branch_name> <additional_information>'. Previous `/commit` are always ignored.";
+              "\n### Hint\n\nEither update the document and close discussion OR 'Close with comment' with `/commit <branch_name>` and additional information'.\n\n##### Previous `/commit`s are always ignored.";
             const message =
               process.env.STATUS === 'invalid'
-                ? `This discussion cannot be closed yet. Branch '${process.env.BRANCH}' is invalid.\n${hint}`
+                ? `This discussion cannot be closed yet. Branch \`${process.env.BRANCH}\` is invalid.\n${hint}`
                 : `This discussion cannot be closed yet. Please specify a branch so I can commit the markdown document to it.\n${hint}`;
 
             await github.graphql(
