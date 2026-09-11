@@ -25,16 +25,21 @@ body:
       required: true
 
   - type: textarea
-    id: options
+    id: interrogations
     attributes:
-      label: Options
-      description: What are our options?
+      label: Interrogation 
+      description: What questions need to be answered ? What topic should be looked further in-depth ?
       placeholder: |
-        1. Stay with MySQL and optimize
-        2. Migrate to PostgreSQL
-        3. Migrate to MongoDB
+        - What database needs should the project prioritize ? 
+        - Look into OLTP and OLAP.
     validations:
-      required: true
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        🧠 **The fields below requires teamwork to achieve the best decision. You should draft them first and wait for team feedbacks.**
 
   - type: dropdown
     id: decision
@@ -67,9 +72,18 @@ body:
       required: false
 
   - type: textarea
-    id: consequences
+    id: consequences-upside
     attributes:
-      label: Consequences
+      label: Consequences -- Upside
+      description: What are the expected benefits ?
+      placeholder: Fast database queries.
+    validations:
+      required: false
+
+  - type: textarea
+    id: consequences-tradeoff
+    attributes:
+      label: Consequences -- Trade-offs and risks
       description: What are the expected consequences, trade-offs, or risks?
       placeholder: Optimization work required; no migration.
     validations:
