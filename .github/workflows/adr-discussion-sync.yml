@@ -260,11 +260,6 @@ jobs:
             out.push('');
             out.push(discussion.body.trim() || '_(empty body)_');
             out.push('');
-            out.push('### Poster');
-            out.push('');
-            out.push(
-              `Originally posted by ${who(discussion.author)} on ${when(discussion.createdAt)}.`,
-            );
             out.push('---');
             out.push('## Comments');
             out.push('');
