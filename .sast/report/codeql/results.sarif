@@ -2981,7 +2981,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/persistence/index.js",
+                      "uri": "backend/src/index.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 0
                     }
@@ -3039,7 +3039,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/index.js",
+                      "uri": "backend/src/routes/addItem.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 2
                     }
@@ -3068,7 +3068,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/routes/addItem.js",
+                      "uri": "backend/src/persistence/index.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 3
                     }
@@ -3155,7 +3155,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "frontend/components/TodoApp.jsx",
+                      "uri": "frontend/src/App.jsx",
                       "uriBaseId": "%SRCROOT%",
                       "index": 6
                     }
@@ -3184,7 +3184,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "frontend/src/App.jsx",
+                      "uri": "frontend/components/TodoApp.jsx",
                       "uriBaseId": "%SRCROOT%",
                       "index": 7
                     }
@@ -3244,7 +3244,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/index.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 2
+                      "index": 0
                     }
                   }
                 }
@@ -3270,7 +3270,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/persistence/index.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 0
+                      "index": 3
                     }
                   }
                 }
@@ -3296,7 +3296,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/routes/addItem.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 3
+                      "index": 2
                     }
                   }
                 }
@@ -3398,7 +3398,7 @@
                 "text": ""
               },
               "level": "none",
-              "timeUtc": "2026-09-11T09:30:15.763Z",
+              "timeUtc": "2026-09-11T14:01:57.961Z",
               "descriptor": {
                 "id": "codeql-action/overlay-disabled",
                 "index": 1
@@ -3420,7 +3420,7 @@
       "artifacts": [
         {
           "location": {
-            "uri": "backend/src/persistence/index.js",
+            "uri": "backend/src/index.js",
             "uriBaseId": "%SRCROOT%",
             "index": 0
           }
@@ -3434,14 +3434,14 @@
         },
         {
           "location": {
-            "uri": "backend/src/index.js",
+            "uri": "backend/src/routes/addItem.js",
             "uriBaseId": "%SRCROOT%",
             "index": 2
           }
         },
         {
           "location": {
-            "uri": "backend/src/routes/addItem.js",
+            "uri": "backend/src/persistence/index.js",
             "uriBaseId": "%SRCROOT%",
             "index": 3
           }
@@ -3462,14 +3462,14 @@
         },
         {
           "location": {
-            "uri": "frontend/components/TodoApp.jsx",
+            "uri": "frontend/src/App.jsx",
             "uriBaseId": "%SRCROOT%",
             "index": 6
           }
         },
         {
           "location": {
-            "uri": "frontend/src/App.jsx",
+            "uri": "frontend/components/TodoApp.jsx",
             "uriBaseId": "%SRCROOT%",
             "index": 7
           }
@@ -3523,7 +3523,7 @@
         "codeqlConfigSummary": {
           "disableDefaultQueries": false
         },
-        "jobRunUuid": "d29e2997-0782-4ac6-817c-f2b763b4bcd5"
+        "jobRunUuid": "aea12bba-20f7-46ff-a3a1-a1f831819f31"
       }
     }
   ]
