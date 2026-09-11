@@ -6,9 +6,9 @@ name: adr-discussion-sync
 #   * If the decision is not "Accepted", do nothing.
 #   * The target branch is normally the `branch` field in the discussion body,
 #     but a failsafe lets anyone closing the discussion override it: if the
-#     discussion is closed with a comment starting with "/commit <branch>
-#     <details>", that branch wins over the body field. This lets someone who
-#     isn't the author close the discussion quickly without editing the post.
+#     discussion is closed with a comment starting with "/commit <branch>",
+#     that branch wins over the body field. This lets someone who isn't the
+#     author close the discussion quickly without editing the post.
 #   * If no branch can be found (body field empty, no /commit override), or
 #     the resolved branch name is not a valid git branch name, comment asking
 #     for a valid one and reopen the discussion so it can be closed again.
@@ -66,8 +66,8 @@ jobs:
             const bodyBranch = field('Branch');
 
             // Failsafe: whoever closes the discussion can override the branch
-            // with "Close with comment" + "/commit <branch_name> <details>",
-            // without needing to be the author or edit the discussion body.
+            // with "Close with comment" + "/commit <branch_name>", without
+            // needing to be the author or edit the discussion body.
             // The most recent comment is the one that closed the discussion.
             const { repository } = await github.graphql(
               `query ($owner: String!, $repo: String!, $number: Int!) {
@@ -132,7 +132,7 @@ jobs:
           script: |
             const discussionId = context.payload.discussion.node_id;
             const hint =
-              "Either update the document and close discussion OR 'Close with comment' with '/commit <branch_name> <details>'.";
+              "Either update the document and close discussion OR 'Close with comment' with '/commit <branch_name>'.";
             const message =
               process.env.STATUS === 'invalid'
                 ? `This discussion cannot be closed yet. Branch '${process.env.BRANCH}' is invalid.\n${hint}`
