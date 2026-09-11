@@ -1,5 +1,11 @@
 
 body:
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        💡 **If this is a Superseded document, you can use the previous ADR name as Title. ADRs will have a github #number.**
+
   - type: input
     id: date
     attributes:
@@ -97,4 +103,5 @@ body:
     attributes:
       value: |
         ---
-        💡 **Once the decision has been implemented, please come back and leave a final comment summarizing the outcome and close the discussion. Make sure to include a branch to commit the document.**
+        💡 **Once the decision has been implemented, please come back and leave a final comment summarizing the outcome and close the discussion.
+        Make sure to include a branch to commit the document.**

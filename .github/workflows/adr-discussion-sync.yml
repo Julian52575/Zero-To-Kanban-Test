@@ -132,7 +132,7 @@ jobs:
           script: |
             const discussionId = context.payload.discussion.node_id;
             const hint =
-              "Either update the document and close discussion OR 'Close with comment' with '/commit <branch_name> <additional_information>'.";
+              "Either update the document and close discussion OR 'Close with comment' with '/commit <branch_name> <additional_information>'. Previous `/commit` are always ignored.";
             const message =
               process.env.STATUS === 'invalid'
                 ? `This discussion cannot be closed yet. Branch '${process.env.BRANCH}' is invalid.\n${hint}`
