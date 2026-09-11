@@ -132,7 +132,7 @@ jobs:
           script: |
             const discussionId = context.payload.discussion.node_id;
             const hint =
-              "Either update the document and close discussion OR 'Close with comment' with '/commit <branch_name>'.";
+              "Either update the document and close discussion OR 'Close with comment' with '/commit <branch_name> <additional_information>'.";
             const message =
               process.env.STATUS === 'invalid'
                 ? `This discussion cannot be closed yet. Branch '${process.env.BRANCH}' is invalid.\n${hint}`
@@ -232,7 +232,7 @@ jobs:
             const when = (iso) =>
               new Date(iso).toISOString().replace('T', ' ').slice(0, 16) + 'Z';
 
-            // ---- target file: docs/adr/<discussion title>.md ----
+            // ---- target file: docs/adr/<discussion title>-#<number>.md ----
             const illegal = /[\/\\?%*:|"<>]/g; // path / FS unsafe characters
             const safeTitle =
               discussion.title
@@ -244,7 +244,7 @@ jobs:
                 .replace(/[-.]+$/, '')
                 .slice(0, 200) || `discussion-${number}`;
             const dir = 'docs/adr';
-            const file = path.join(dir, `${safeTitle}.md`);
+            const file = path.join(dir, `${safeTitle}-#${number}.md`);
             fs.mkdirSync(dir, { recursive: true });
 
             const out = [];
