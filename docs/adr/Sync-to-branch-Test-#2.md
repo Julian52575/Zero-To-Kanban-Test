@@ -4,7 +4,7 @@
 - **Category:** Architecture Decision Records
 - **Original poster:** @Julian52575
 - **Opened:** 2026-09-11 08:06Z
-- **Closed:** 2026-09-11 09:04Z
+- **Closed:** 2026-09-11 09:10Z
 
 ### Discussion
 
@@ -122,4 +122,50 @@ Either update the document and close discussion OR 'Close with comment' with '/c
 #### @Julian52575 -- 2026-09-11 09:04Z
 
 /commit adr-comment-over-body this is additional context
+
+#### @Julian52575 -- 2026-09-11 09:05Z
+
+/commit
+
+#### @github-actions -- 2026-09-11 09:05Z
+
+This discussion cannot be closed yet. Branch `### Justification` is invalid.
+
+### Hint
+
+Either update the document and close discussion OR 'Close with comment' with `/commit <branch_name>` and additional information'.
+
+##### Previous `/commit`s are always ignored.
+
+#### @Julian52575 -- 2026-09-11 09:08Z
+
+/commit [[[[[
+
+#### @github-actions -- 2026-09-11 09:09Z
+
+This discussion cannot be closed yet. Branch `[[[[[` is invalid.
+
+### Hint
+
+Either update the document and close discussion OR 'Close with comment' with `/commit <branch_name>` and write additional information if needed.
+
+##### Previous `/commit`s are always ignored.
+
+#### @Julian52575 -- 2026-09-11 09:09Z
+
+/commit
+
+#### @github-actions -- 2026-09-11 09:09Z
+
+This discussion cannot be closed yet. Branch `### Justification` is invalid.
+
+### Hint
+
+Either update the document and close discussion OR 'Close with comment' with `/commit <branch_name>` and write additional information if needed.
+
+##### Previous `/commit`s are always ignored.
+
+#### @Julian52575 -- 2026-09-11 09:10Z
+
+/commit adr-comment-over-body
 
