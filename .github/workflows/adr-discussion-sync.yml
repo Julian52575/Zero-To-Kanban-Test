@@ -299,17 +299,102 @@ jobs:
             core.setOutput('title', discussion.title);
 
       - name: Commit and push to the target branch
+        id: commit
         if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.status == 'ok'
+        continue-on-error: true # a failure here is reported as a comment below, not a red workflow run
         env:
           TARGET_BRANCH: ${{ steps.fields.outputs.branch }}
           DOC_TITLE: ${{ steps.render.outputs.title }}
           DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           git add docs/adr
-          if git status --porcelain docs/adr | grep -q .; then
-            git commit -m "docs(adr): accepted adr \"$DOC_TITLE\" (#$DISCUSSION_NUMBER)"
-            git push origin "HEAD:$TARGET_BRANCH"
-          else
+
+          if ! git status --porcelain docs/adr | grep -q .; then
             echo "Nothing changed -- discussion already in sync."
+            echo "committed=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          error_log=""
+          if ! error_log=$(git commit -m "docs(adr): accepted adr \"$DOC_TITLE\" (#$DISCUSSION_NUMBER)" 2>&1); then
+            :
+          elif ! error_log=$(git push origin "HEAD:$TARGET_BRANCH" 2>&1); then
+            :
+          else
+            error_log=""
+          fi
+
+          if [ -n "$error_log" ]; then
+            echo "$error_log"
+            echo "committed=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "error<<ADR_COMMIT_ERROR_EOF"
+              echo "$error_log"
+              echo "ADR_COMMIT_ERROR_EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Comment the commit outcome
+        if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.status == 'ok' && steps.commit.outputs.committed != ''
+        uses: actions/github-script@v7
+        env:
+          TARGET_BRANCH: ${{ steps.fields.outputs.branch }}
+          COMMITTED: ${{ steps.commit.outputs.committed }}
+          SHA: ${{ steps.commit.outputs.sha }}
+          ERROR_LOG: ${{ steps.commit.outputs.error }}
+          DOC_FILE: ${{ steps.render.outputs.file }}
+        with:
+          github-token: ${{ secrets.ADR_SYNC_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const discussionId = context.payload.discussion.node_id;
+            const { owner, repo } = context.repo;
+            const branch = process.env.TARGET_BRANCH;
+            const base = context.serverUrl;
+
+            const addComment = (body) =>
+              github.graphql(
+                `mutation ($discussionId: ID!, $body: String!) {
+                  addDiscussionComment(input: { discussionId: $discussionId, body: $body }) {
+                    comment { id }
+                  }
+                }`,
+                { discussionId, body },
+              );
+
+            if (process.env.COMMITTED === 'true') {
+              const sha = process.env.SHA;
+              const shortSha = sha.slice(0, 7);
+              const commitLink = `${base}/${owner}/${repo}/commit/${sha}`;
+
+              await addComment(
+                `This discussion was commited into ${branch}: [${shortSha}](${commitLink})`,
+              );
+              return;
+            }
+
+            // committed === 'false' with an error log -- the commit/push failed.
+            if (!process.env.ERROR_LOG) return; // nothing changed, already in sync -- no comment needed
+
+            const runLink = `${base}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const editLink = `${base}/${owner}/${repo}/edit/${branch}/${process.env.DOC_FILE}`;
+
+            await addComment(
+              `This discussion cannot be closed yet. An error occurred when committing:\n\n` +
+                '```\n' + process.env.ERROR_LOG + '\n```' +
+                `\n\n##### [See workflow run](${runLink})\n\n` +
+                `You can wait for the issue to be fixed or manually copy the discussion body and comments' markdown into [${branch}:${process.env.DOC_FILE}](${editLink})`,
+            );
+
+            await github.graphql(
+              `mutation ($discussionId: ID!) {
+                reopenDiscussion(input: { discussionId: $discussionId }) {
+                  discussion { id }
+                }
+              }`,
+              { discussionId },
+            );
