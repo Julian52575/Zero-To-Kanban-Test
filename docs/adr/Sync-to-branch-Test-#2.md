@@ -4,7 +4,7 @@
 - **Category:** Architecture Decision Records
 - **Original poster:** @Julian52575
 - **Opened:** 2026-09-11 08:06Z
-- **Closed:** 2026-09-11 08:39Z
+- **Closed:** 2026-09-11 09:04Z
 
 ### Discussion
 
@@ -25,8 +25,6 @@ afewgerbrg
 Accepted
 
 ### Branch
-
-adr-body-on-empty-command
 
 ### Justification
 
@@ -101,4 +99,27 @@ Either update the document and close discussion OR 'Close with comment' with '/c
 #### @Julian52575 -- 2026-09-11 08:39Z
 
 /commit adr-comment-over-body
+
+#### @Julian52575 -- 2026-09-11 08:41Z
+
+Commit to the body branch please
+
+#### @Julian52575 -- 2026-09-11 08:51Z
+
+/commit
+
+#### @Julian52575 -- 2026-09-11 08:52Z
+
+/commit
+
+#### @github-actions -- 2026-09-11 08:52Z
+
+This discussion cannot be closed yet. Branch '### Justification
+
+_No response_' is invalid.
+Either update the document and close discussion OR 'Close with comment' with '/commit <branch_name> <additional_information>'. Previous `/commit` are always ignored.
+
+#### @Julian52575 -- 2026-09-11 09:04Z
+
+/commit adr-comment-over-body this is additional context
 
