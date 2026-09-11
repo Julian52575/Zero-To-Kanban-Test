@@ -372,7 +372,7 @@ jobs:
               const commitLink = `${base}/${owner}/${repo}/commit/${sha}`;
 
               await addComment(
-                `This discussion was commited into ${branch}: [${shortSha}](${commitLink})`,
+                `This discussion was committed into \`${branch}\`: [${shortSha}](${commitLink})`,
               );
               return;
             }
