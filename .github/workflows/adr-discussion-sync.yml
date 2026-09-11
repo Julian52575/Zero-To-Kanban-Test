@@ -1,36 +1,25 @@
 name: adr-discussion-sync
 
 # When a GitHub Discussion in the "Architecture Decision Records" category is
-# CLOSED, mirror the whole discussion (body + every comment + the original
-# poster) into docs/adr/<discussion title>.md and raise a pull request that
-# asks a maintainer to merge it.
+# CLOSED:
 #
-# The model is the same as release-please:
-#   * one long-lived branch  -- `adr-discussion-update`
-#   * one long-lived PR against the default branch
-#   * every close APPENDS to that branch/PR; nothing reaches main until a
-#     maintainer merges the PR.
-#
-# Re-opening and then re-closing a discussion does NOT rewrite the existing
-# file. Each close appends a fresh "## Sync -- closed <timestamp>" section that
-# captures the discussion and its comments as they stood at that moment, so the
-# record keeps its own history.
-#
-# The `discussion` event only ever fires on the repository's default branch,
-# so this workflow always runs against main.
+#   * If the decision is not "Accepted", do nothing.
+#   * If the `branch` field is empty, comment asking for it and reopen the
+#     discussion so it can be closed again once filled in.
+#   * If the `branch` field is set, render the discussion (body + comments)
+#     into docs/adr/<discussion title>.md and commit it straight to that
+#     branch.
 
 on:
   discussion:
     types: [closed]
 
 permissions:
-  contents: write # push the adr-discussion-update branch
-  discussions: read # read the discussion body + comments over GraphQL
-  pull-requests: write # open / update the sync PR
+  contents: write # push the ADR document to the target branch
+  discussions: write # comment on / reopen the discussion when branch is missing
 
-# Serialize: every run mutates the same branch and the same PR.
 concurrency:
-  group: adr-discussion-sync
+  group: adr-discussion-sync-${{ github.event.discussion.number }}
   cancel-in-progress: false
 
 jobs:
@@ -40,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout default branch
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -51,30 +40,77 @@ jobs:
           # Falls back to GITHUB_TOKEN when the secret is not set.
           token: ${{ secrets.ADR_SYNC_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Prepare the adr-discussion-update branch
+      - name: Parse the ADR form fields
+        id: fields
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.discussion.body || '';
+
+            // Discussion forms render each field as "### <Label>\n\n<value>\n\n".
+            const field = (label) => {
+              const re = new RegExp(
+                `### ${label}\\r?\\n\\r?\\n([\\s\\S]*?)(?=\\r?\\n### |$)`,
+              );
+              const m = body.match(re);
+              return m ? m[1].trim() : '';
+            };
+
+            const decision = field('Decision');
+            const branch = field('Branch');
+
+            core.setOutput('decision', decision);
+            core.setOutput('branch', branch);
+            core.info(`decision="${decision}" branch="${branch}"`);
+
+      - name: Ask for the branch and reopen the discussion
+        if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.branch == ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ADR_SYNC_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const discussionId = context.payload.discussion.node_id;
+
+            await github.graphql(
+              `mutation ($discussionId: ID!, $body: String!) {
+                addDiscussionComment(input: { discussionId: $discussionId, body: $body }) {
+                  comment { id }
+                }
+              }`,
+              {
+                discussionId,
+                body: "This discussion cannot be closed yet. Please fill the `branch` field so I can commit the markdown document to it.",
+              },
+            );
+
+            await github.graphql(
+              `mutation ($discussionId: ID!) {
+                reopenDiscussion(input: { discussionId: $discussionId }) {
+                  discussion { id }
+                }
+              }`,
+              { discussionId },
+            );
+
+      - name: Check out the target branch
+        if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.branch != ''
         env:
-          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          TARGET_BRANCH: ${{ steps.fields.outputs.branch }}
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git fetch origin "$BASE_BRANCH"
-
-          BRANCH=adr-discussion-update
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-            git fetch origin "$BRANCH"
-            git checkout -B "$BRANCH" "origin/$BRANCH"
-            # Keep the PR mergeable: fold in whatever has landed on the base
-            # branch since the PR was opened. The branch only ever touches
-            # docs/adr/, so this stays conflict-free in practice.
-            git merge --no-edit "origin/$BASE_BRANCH"
+          if git ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$TARGET_BRANCH"
+            git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
           else
-            git checkout -B "$BRANCH" "origin/$BASE_BRANCH"
+            git checkout -B "$TARGET_BRANCH"
           fi
 
       - name: Render the discussion into docs/adr
         id: render
+        if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.branch != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.ADR_SYNC_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -147,23 +183,14 @@ jobs:
             const file = path.join(dir, `${safeTitle}.md`);
             fs.mkdirSync(dir, { recursive: true });
 
-            const existed = fs.existsSync(file);
-
-            // ---- header, written once, never rewritten afterwards ----
-            let header = '';
-            if (!existed) {
-              header += `# ${discussion.title}\n\n`;
-              header += `- **Discussion:** [#${discussion.number}](${discussion.url})\n`;
-              header += `- **Category:** ${discussion.category.name}\n`;
-              header += `- **Original poster:** ${who(discussion.author)}\n`;
-              header += `- **Opened:** ${when(discussion.createdAt)}\n\n`;
-              header += `<!-- adr-discussion-sync appends one section per close below; existing sections are never rewritten -->\n`;
-            }
-
-            // ---- one appended section per close ----
             const out = [];
+            out.push(`# ${discussion.title}`);
             out.push('');
-            out.push(`## Sync -- closed ${when(new Date().toISOString())}`);
+            out.push(`- **Discussion:** [#${discussion.number}](${discussion.url})`);
+            out.push(`- **Category:** ${discussion.category.name}`);
+            out.push(`- **Original poster:** ${who(discussion.author)}`);
+            out.push(`- **Opened:** ${when(discussion.createdAt)}`);
+            out.push(`- **Closed:** ${when(new Date().toISOString())}`);
             out.push('');
             out.push('### Discussion');
             out.push('');
@@ -190,7 +217,6 @@ jobs:
                 }
               }
             }
-            // Poster name lives at the bottom of the document, as requested.
             out.push('### Poster');
             out.push('');
             out.push(
@@ -198,93 +224,23 @@ jobs:
             );
             out.push('');
 
-            fs.appendFileSync(file, header + out.join('\n'));
+            fs.writeFileSync(file, out.join('\n'));
 
             core.setOutput('file', file);
-            core.setOutput('status', existed ? 'updated' : 'new');
             core.setOutput('title', discussion.title);
 
-      - name: Commit, push, and open / update the PR
-        uses: actions/github-script@v7
+      - name: Commit and push to the target branch
+        if: steps.fields.outputs.decision == 'Accepted' && steps.fields.outputs.branch != ''
         env:
+          TARGET_BRANCH: ${{ steps.fields.outputs.branch }}
           DOC_TITLE: ${{ steps.render.outputs.title }}
           DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
-        with:
-          github-token: ${{ secrets.ADR_SYNC_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const { execSync } = require('child_process');
-            const sh = (c) => execSync(c, { encoding: 'utf8' }).trim();
-
-            const BRANCH = 'adr-discussion-update';
-            const BASE = context.payload.repository.default_branch;
-
-            sh('git add docs/adr');
-            if (sh('git status --porcelain docs/adr') === '') {
-              core.info('Nothing changed -- discussion already in sync.');
-              return;
-            }
-
-            const title = process.env.DOC_TITLE;
-            const num = process.env.DISCUSSION_NUMBER;
-            sh(
-              `git commit -m ${JSON.stringify(`docs(adr): sync "${title}" (#${num})`)}`,
-            );
-            sh(`git push --force-with-lease origin HEAD:${BRANCH}`);
-
-            // ---- PR body: every new / updated doc on the branch vs. base ----
-            const diff = sh(
-              `git diff --name-status origin/${BASE}...HEAD -- docs/adr/`,
-            );
-            const created = [];
-            const updated = [];
-            for (const row of diff.split('\n').filter(Boolean)) {
-              const [status, ...rest] = row.split('\t');
-              const f = rest.join('\t');
-              if (status === 'A') created.push(f);
-              else updated.push(f); // M / R / C -> treat as updated
-            }
-            const bullets = (arr) =>
-              arr.length ? arr.map((f) => `- \`${f}\``).join('\n') : '_None._';
-
-            const body = [
-              'Automated save of closed **Architecture Decision Records** discussions into `docs/adr/`.',
-              '',
-              `Merge this PR to publish the records to \`${BASE}\`. Each further close appends here until it is merged.`,
-              '',
-              '### New documents',
-              bullets(created),
-              '',
-              '### Updated documents',
-              bullets(updated),
-            ].join('\n');
-
-            const prTitle =
-              'docs(adr): 🤖 saving closed Architecture Decision Records discussions';
-
-            const { data: open } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              head: `${context.repo.owner}:${BRANCH}`,
-            });
-
-            if (open.length) {
-              await github.rest.pulls.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: open[0].number,
-                title: prTitle,
-                body,
-              });
-              core.info(`Updated PR #${open[0].number}`);
-            } else {
-              const { data: pr } = await github.rest.pulls.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                base: BASE,
-                head: BRANCH,
-                title: prTitle,
-                body,
-              });
-              core.info(`Opened PR #${pr.number}`);
-            }
+        run: |
+          set -euo pipefail
+          git add docs/adr
+          if git status --porcelain docs/adr | grep -q .; then
+            git commit -m "docs(adr): sync \"$DOC_TITLE\" (#$DISCUSSION_NUMBER)"
+            git push origin "HEAD:$TARGET_BRANCH"
+          else
+            echo "Nothing changed -- discussion already in sync."
+          fi
