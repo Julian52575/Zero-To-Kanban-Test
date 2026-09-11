@@ -4,7 +4,7 @@
 - **Category:** Architecture Decision Records
 - **Original poster:** @Julian52575
 - **Opened:** 2026-09-11 08:06Z
-- **Closed:** 2026-09-11 09:10Z
+- **Closed:** 2026-09-11 09:25Z
 
 ### Discussion
 
@@ -166,6 +166,10 @@ Either update the document and close discussion OR 'Close with comment' with `/c
 ##### Previous `/commit`s are always ignored.
 
 #### @Julian52575 -- 2026-09-11 09:10Z
+
+/commit adr-comment-over-body
+
+#### @Julian52575 -- 2026-09-11 09:25Z
 
 /commit adr-comment-over-body
 
