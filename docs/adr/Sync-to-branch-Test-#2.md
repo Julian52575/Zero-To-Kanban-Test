@@ -4,7 +4,7 @@
 - **Category:** Architecture Decision Records
 - **Original poster:** @Julian52575
 - **Opened:** 2026-09-11 08:06Z
-- **Closed:** 2026-09-11 08:42Z
+- **Closed:** 2026-09-11 08:51Z
 
 ### Discussion
 
@@ -105,4 +105,8 @@ Either update the document and close discussion OR 'Close with comment' with '/c
 #### @Julian52575 -- 2026-09-11 08:41Z
 
 Commit to the body branch please
+
+#### @Julian52575 -- 2026-09-11 08:51Z
+
+/commit
 
