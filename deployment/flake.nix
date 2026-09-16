@@ -145,7 +145,13 @@
               if ! kubectl get namespace argocd >/dev/null 2>&1; then
                 echo "argocd: installing into the cluster (first run only)..."
                 _run kubectl create namespace argocd
-                _run kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+                # --server-side: the applicationsets.argoproj.io CRD's
+                # schema is big enough that client-side `kubectl apply`'s
+                # last-applied-configuration annotation blows past
+                # Kubernetes' 262144-byte annotation limit. Server-side
+                # apply tracks field ownership on the API server instead,
+                # so it doesn't need that annotation at all.
+                _run kubectl apply --server-side -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
                 _run kubectl -n argocd wait --for=condition=available --timeout=300s deployment/argocd-server \
                   || echo "argocd: server not ready yet -- 'kubectl -n argocd get pods' to check" >&2
               fi

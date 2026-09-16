@@ -1,0 +1,32 @@
+set shell := ["bash", "-eu", "-c"]
+
+# List available recipes
+default:
+    @just --list
+
+unit := "zero-to-kanban-k3s"
+data_dir := justfile_directory() + "/.k3s"
+kubeconfig := justfile_directory() + "/k3s.yaml"
+
+# Stop the rootless k3s node and delete all its state (Argo CD, Postgres
+# data, everything) -- next `nix develop`/`cd` into deployment/ bootstraps
+# a fully fresh cluster and re-syncs Argo CD straight from git.
+rm:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if systemctl --user is-active --quiet "{{unit}}.scope" 2>/dev/null; then
+        echo "+ systemctl --user stop {{unit}}.scope"
+        systemctl --user stop "{{unit}}.scope"
+    else
+        echo "k3s: {{unit}}.scope not active, nothing to stop"
+    fi
+    if [ -d "{{data_dir}}" ]; then
+        echo "+ rootlesskit rm -rf {{data_dir}}"
+        # containerd's overlayfs snapshots are owned by uids remapped
+        # through the rootless user namespace -- a plain `rm -rf` from
+        # outside that namespace hits "Permission denied" on some of
+        # them, so removal has to happen from inside it.
+        rootlesskit rm -rf "{{data_dir}}"
+    fi
+    rm -f "{{kubeconfig}}"
+    echo "k3s: cluster state removed"
