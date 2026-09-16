@@ -2981,7 +2981,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/routes/addItem.js",
+                      "uri": "backend/src/persistence/index.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 0
                     }
@@ -3010,7 +3010,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/persistence/index.js",
+                      "uri": "backend/src/routes/deleteItem.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 1
                     }
@@ -3039,7 +3039,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/routes/deleteItem.js",
+                      "uri": "backend/src/routes/addItem.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 2
                     }
@@ -3270,7 +3270,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/persistence/index.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 1
+                      "index": 0
                     }
                   }
                 }
@@ -3296,7 +3296,33 @@
                     "artifactLocation": {
                       "uri": "backend/src/routes/addItem.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 0
+                      "index": 2
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": ""
+              },
+              "level": "none",
+              "descriptor": {
+                "id": "cli/expected-extracted-files/javascript",
+                "index": 0
+              },
+              "properties": {
+                "formattedMessage": {
+                  "text": ""
+                }
+              }
+            },
+            {
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "backend/src/routes/deleteItem.js",
+                      "uriBaseId": "%SRCROOT%",
+                      "index": 1
                     }
                   }
                 }
@@ -3346,32 +3372,6 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/routes/deleteItem.js",
-                      "uriBaseId": "%SRCROOT%",
-                      "index": 2
-                    }
-                  }
-                }
-              ],
-              "message": {
-                "text": ""
-              },
-              "level": "none",
-              "descriptor": {
-                "id": "cli/expected-extracted-files/javascript",
-                "index": 0
-              },
-              "properties": {
-                "formattedMessage": {
-                  "text": ""
-                }
-              }
-            },
-            {
-              "locations": [
-                {
-                  "physicalLocation": {
-                    "artifactLocation": {
                       "uri": "backend/src/routes/getItems.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 4
@@ -3398,7 +3398,7 @@
                 "text": ""
               },
               "level": "none",
-              "timeUtc": "2026-09-16T21:15:06.674Z",
+              "timeUtc": "2026-09-16T21:39:13.666Z",
               "descriptor": {
                 "id": "codeql-action/overlay-disabled",
                 "index": 1
@@ -3420,21 +3420,21 @@
       "artifacts": [
         {
           "location": {
-            "uri": "backend/src/routes/addItem.js",
+            "uri": "backend/src/persistence/index.js",
             "uriBaseId": "%SRCROOT%",
             "index": 0
           }
         },
         {
           "location": {
-            "uri": "backend/src/persistence/index.js",
+            "uri": "backend/src/routes/deleteItem.js",
             "uriBaseId": "%SRCROOT%",
             "index": 1
           }
         },
         {
           "location": {
-            "uri": "backend/src/routes/deleteItem.js",
+            "uri": "backend/src/routes/addItem.js",
             "uriBaseId": "%SRCROOT%",
             "index": 2
           }
@@ -3523,7 +3523,7 @@
         "codeqlConfigSummary": {
           "disableDefaultQueries": false
         },
-        "jobRunUuid": "fafd158a-eb93-4ecc-b23b-9e36f2c9fe45"
+        "jobRunUuid": "a362b1b2-22c7-4e51-a28c-9eb19ed3378f"
       }
     }
   ]
