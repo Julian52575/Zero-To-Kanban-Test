@@ -2981,7 +2981,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/persistence/index.js",
+                      "uri": "backend/src/index.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 0
                     }
@@ -3010,7 +3010,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/index.js",
+                      "uri": "backend/src/persistence/index.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 1
                     }
@@ -3097,7 +3097,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/routes/getItems.js",
+                      "uri": "backend/src/routes/updateItem.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 4
                     }
@@ -3126,7 +3126,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/routes/updateItem.js",
+                      "uri": "backend/src/routes/getItems.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 5
                     }
@@ -3244,7 +3244,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/index.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 1
+                      "index": 0
                     }
                   }
                 }
@@ -3270,7 +3270,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/persistence/index.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 0
+                      "index": 1
                     }
                   }
                 }
@@ -3322,7 +3322,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/routes/updateItem.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 5
+                      "index": 4
                     }
                   }
                 }
@@ -3374,7 +3374,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/routes/getItems.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 4
+                      "index": 5
                     }
                   }
                 }
@@ -3398,7 +3398,7 @@
                 "text": ""
               },
               "level": "none",
-              "timeUtc": "2026-09-16T09:46:18.600Z",
+              "timeUtc": "2026-09-16T16:46:22.822Z",
               "descriptor": {
                 "id": "codeql-action/overlay-disabled",
                 "index": 1
@@ -3420,14 +3420,14 @@
       "artifacts": [
         {
           "location": {
-            "uri": "backend/src/persistence/index.js",
+            "uri": "backend/src/index.js",
             "uriBaseId": "%SRCROOT%",
             "index": 0
           }
         },
         {
           "location": {
-            "uri": "backend/src/index.js",
+            "uri": "backend/src/persistence/index.js",
             "uriBaseId": "%SRCROOT%",
             "index": 1
           }
@@ -3448,14 +3448,14 @@
         },
         {
           "location": {
-            "uri": "backend/src/routes/getItems.js",
+            "uri": "backend/src/routes/updateItem.js",
             "uriBaseId": "%SRCROOT%",
             "index": 4
           }
         },
         {
           "location": {
-            "uri": "backend/src/routes/updateItem.js",
+            "uri": "backend/src/routes/getItems.js",
             "uriBaseId": "%SRCROOT%",
             "index": 5
           }
@@ -3523,7 +3523,7 @@
         "codeqlConfigSummary": {
           "disableDefaultQueries": false
         },
-        "jobRunUuid": "10a3711a-126a-4ca3-951a-90e42463645a"
+        "jobRunUuid": "5b73b5ad-329e-4f2b-afc7-4923a2f9b31e"
       }
     }
   ]
