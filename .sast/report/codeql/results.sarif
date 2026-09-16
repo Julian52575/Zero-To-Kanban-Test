@@ -3398,7 +3398,7 @@
                 "text": ""
               },
               "level": "none",
-              "timeUtc": "2026-09-16T09:14:28.398Z",
+              "timeUtc": "2026-09-16T09:21:01.061Z",
               "descriptor": {
                 "id": "codeql-action/overlay-disabled",
                 "index": 1
@@ -3523,7 +3523,7 @@
         "codeqlConfigSummary": {
           "disableDefaultQueries": false
         },
-        "jobRunUuid": "23e82975-7f42-4f9e-b8ea-6cd9fd5cc37a"
+        "jobRunUuid": "3a87da06-a026-484a-b64a-26be8d796641"
       }
     }
   ]
