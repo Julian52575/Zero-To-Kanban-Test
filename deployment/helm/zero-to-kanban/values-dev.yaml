@@ -10,6 +10,17 @@ frontend:
   image:
     tag: manual-test
   replicaCount: 1
+  # The dev image runs the Vite/Rolldown dev server in-cluster, not the
+  # prebuilt static bundle the base values.yaml's 128Mi limit assumes -- the
+  # dev server routinely needs several hundred MB and was getting OOM-killed
+  # (memory.oom.group), taking down the whole rootless k3s node with it.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
 
 ingress:
   host: kanban-dev.example.com
