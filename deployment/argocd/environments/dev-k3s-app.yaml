@@ -1,0 +1,40 @@
+# Dev Application for a local, rootless k3s cluster (see deployment/flake.nix).
+#
+# k3s bundles its own Traefik (CRDs included), so templates/ingressroute.yaml
+# works against it unmodified -- nothing else to install for ingress. This
+# is otherwise identical to dev-app.yaml; kept as a separate Application so
+# a local k3s run never collides with a shared/remote dev cluster synced
+# from dev-app.yaml.
+#
+# This Application is meant to be applied directly for local use, not
+# necessarily discovered through root-app.yaml (a fresh local k3s cluster
+# has no Argo CD "root" bootstrapped yet unless you install Argo CD into it
+# too):
+#   export KUBECONFIG=deployment/k3s.yaml
+#   kubectl create namespace argocd
+#   kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+#   kubectl apply -n argocd -f deployment/argocd/environments/dev-k3s-app.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zero-to-kanban-dev-k3s
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/julian52575/Zero-To-Kanban-Test.git
+    targetRevision: main
+    path: deployment/helm/zero-to-kanban
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zero-to-kanban-dev-k3s
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

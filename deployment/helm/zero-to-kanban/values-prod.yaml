@@ -1,0 +1,38 @@
+# Overrides for the prod environment. Used by the Argo CD Application in
+# deployment/argocd/environments/prod-app.yaml.
+#
+# NOTE: pin backend/frontend image tags to a release tag (not `latest`)
+# before this is used against a real prod cluster.
+#
+# Postgres password: pre-create the Secret referenced below in the
+# zero-to-kanban-prod namespace before syncing this Application, e.g.:
+#   kubectl create secret generic zero-to-kanban-prod-postgresql \
+#     --namespace zero-to-kanban-prod \
+#     --from-literal=password='<strong-password>'
+# (or manage it via Sealed Secrets / External Secrets Operator instead of
+# kubectl directly). Argo CD never sees the plaintext value either way.
+
+backend:
+  image:
+    tag: latest
+  replicaCount: 4
+
+frontend:
+  image:
+    tag: latest
+  replicaCount: 2
+
+ingress:
+  entryPoints:
+    - websecure
+  host: kanban.example.com
+  tls:
+    enabled: true
+    secretName: kanban-tls
+
+postgresql:
+  auth:
+    existingSecret: zero-to-kanban-prod-postgresql
+  primary:
+    persistence:
+      size: 10Gi

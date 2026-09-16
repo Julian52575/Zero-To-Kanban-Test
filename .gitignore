@@ -22,3 +22,12 @@ result-*
 
 .claude
 .vscode
+
+# --- local k3s (see deployment/flake.nix) -----------------------------
+deployment/.k3s/
+# Cluster credentials -- never commit.
+deployment/k3s.yaml
+
+# --- helm dependency artifacts (see deployment/helm/*/Chart.yaml) -----
+# Regeneratable via `helm dependency update`; Chart.lock IS tracked.
+deployment/helm/*/charts/*.tgz

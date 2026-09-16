@@ -1,0 +1,20 @@
+# Overrides for the dev environment. Used by the Argo CD Application in
+# deployment/argocd/environments/dev-app.yaml.
+
+backend:
+  image:
+    tag: manual-test
+  replicaCount: 1
+
+frontend:
+  image:
+    tag: manual-test
+  replicaCount: 1
+
+ingress:
+  host: kanban-dev.example.com
+
+postgresql:
+  primary:
+    persistence:
+      size: 1Gi

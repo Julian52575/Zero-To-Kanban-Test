@@ -1,0 +1,23 @@
+# Prod is intentionally NOT auto-synced: promote dev -> prod by manually
+# syncing in the Argo CD UI/CLI once a change has been verified in dev.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zero-to-kanban-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/julian52575/Zero-To-Kanban-Test.git
+    targetRevision: main
+    path: deployment/helm/zero-to-kanban
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zero-to-kanban-prod
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

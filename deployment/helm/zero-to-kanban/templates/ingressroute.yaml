@@ -1,0 +1,33 @@
+{{- if .Values.ingress.enabled }}
+# Requires the Traefik CRDs (IngressRoute) installed in-cluster -- see
+# https://doc.traefik.io/traefik/reference/dynamic-configuration/kubernetes-crd/
+#
+# Routing mirrors the docker-compose Traefik proxy: /items -> backend
+# (priority 10), everything else -> frontend (priority 1, catch-all).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "zero-to-kanban.fullname" . }}
+  labels:
+    {{- include "zero-to-kanban.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    {{- toYaml .Values.ingress.entryPoints | nindent 4 }}
+  routes:
+    - match: Host(`{{ .Values.ingress.host }}`) && PathPrefix(`/items`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: {{ include "zero-to-kanban.fullname" . }}-backend
+          port: 3000
+    - match: Host(`{{ .Values.ingress.host }}`) && PathPrefix(`/`)
+      kind: Rule
+      priority: 1
+      services:
+        - name: {{ include "zero-to-kanban.fullname" . }}-frontend
+          port: 5173
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+{{- end }}

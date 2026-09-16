@@ -1,0 +1,11 @@
+apiVersion: v2
+name: zero-to-kanban
+description: Helm chart for the Zero To Kanban Test app (backend, frontend, Postgres)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  - name: postgresql
+    version: "16.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
