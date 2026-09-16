@@ -20,6 +20,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       packages: write
+      id-token: write # required for cosign keyless (OIDC) signing
     strategy:
       matrix:
         include: # Run 1 job for each key (not YxZ matrix)
@@ -27,7 +28,9 @@ jobs:
             context: backend
           - image: frontend
             context: frontend
-      fail-fast: true # fail all if any matrix jobs fails  
+      fail-fast: true # fail all if any matrix jobs fails
+    env:
+      IMAGE: ghcr.io/julian52575/zero-to-kanban-test-${{ matrix.image }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -45,7 +48,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934
         with:
-          images: ghcr.io/julian52575/zero-to-kanban-test-${{ matrix.image }}
+          images: ${{ env.IMAGE }}
           tags: |
             type=ref,event=tag,enable=${{ github.event_name == 'release' }}
             type=raw,value=latest,enable=${{ github.event_name == 'release' }}
@@ -55,6 +58,7 @@ jobs:
             org.opencontainers.image.licenses=MIT
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: ${{ matrix.context }}
@@ -62,3 +66,12 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           sbom: true
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@1aa8e0f2454b781fbf0fbf306a4c9533a0c57409 # v3.7.0
+
+      - name: Sign image (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cosign sign --yes "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}"
