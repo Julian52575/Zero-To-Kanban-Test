@@ -87,6 +87,7 @@
             fi
 
             KUBECONFIG_PATH="$DEPLOY_DIR/k3s.yaml"
+            export KUBECONFIG="$KUBECONFIG_PATH"
             DATA_DIR="$DEPLOY_DIR/.k3s"
             UNIT="zero-to-kanban-k3s"
             mkdir -p "$DATA_DIR"
@@ -136,8 +137,6 @@
                 fi
               ' EXIT
             fi
-
-            export KUBECONFIG="$KUBECONFIG_PATH"
 
             if [ -n "''${K3S_NO_ARGOCD:-}" ]; then
               echo "K3S_NO_ARGOCD set -- skipping Argo CD bootstrap. 'kubectl get nodes' to check the cluster."
