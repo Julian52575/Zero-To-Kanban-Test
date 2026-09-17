@@ -79,6 +79,7 @@ _argocd-base:
 _argocd-info:
     @echo -e "argocd admin password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\n" | lolcat
     @echo "argocd UI: kubectl -n argocd port-forward svc/argocd-server 8081:443" | lolcat
+    @echo "bind traefik: kubectl -n kube-system port-forward svc/traefik 8080:80"  | lolcat
 
 # Remove Argo CD (and everything it manages) from the cluster; the k3s node keeps running
 rm: _k3s-ready
