@@ -25,7 +25,6 @@ frontend:
 ingress:
   entryPoints:
     - websecure
-  host: kanban.example.com
   tls:
     enabled: true
     secretName: kanban-tls

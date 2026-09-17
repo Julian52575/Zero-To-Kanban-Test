@@ -39,7 +39,6 @@ ingress:
   # dev-mode Traefik proxy in docker-compose.yml listens on).
   entryPoints:
     - web
-  host: kanban.example.com
   tls:
     enabled: false
     secretName: ""

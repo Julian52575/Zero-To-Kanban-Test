@@ -22,9 +22,6 @@ frontend:
       cpu: 500m
       memory: 1Gi
 
-ingress:
-  host: kanban-dev.example.com
-
 postgresql:
   # docker.io/bitnami/postgresql dropped all versioned tags in its Aug 2025
   # catalog restructuring and now only publishes a rolling `latest` -- the
