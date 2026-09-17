@@ -5,13 +5,101 @@ default:
     @just --list
 
 unit := "zero-to-kanban-k3s"
-data_dir := justfile_directory() + "/.k3s"
-kubeconfig := justfile_directory() + "/k3s.yaml"
+deploy_dir := justfile_directory()
+repo_root := parent_directory(deploy_dir)
+data_dir := deploy_dir + "/.k3s"
+kubeconfig := deploy_dir + "/k3s.yaml"
 
-# Stop the rootless k3s node and delete all its state (Argo CD, Postgres
-# data, everything) -- next `nix develop`/`cd` into deployment/ bootstraps
-# a fully fresh cluster and re-syncs Argo CD straight from git.
-rm:
+export KUBECONFIG := kubeconfig
+
+# Bootstrap Argo CD syncing from your LOCAL working tree -- commits land without a push
+up-local: _k3s-ready _argocd-base
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! kubectl -n argocd get deployment argocd-repo-server -o jsonpath='{.spec.template.spec.volumes[?(@.name=="local-repo")].name}' | grep -q local-repo; then
+        echo "argocd: bind-mounting {{repo_root}} into argocd-repo-server (one-time)..."
+        kubectl -n argocd patch deployment argocd-repo-server --type=json -p '[
+          {"op": "add", "path": "/spec/template/spec/volumes/-",
+           "value": {"name": "local-repo", "hostPath": {"path": "{{repo_root}}", "type": "Directory"}}},
+          {"op": "add", "path": "/spec/template/spec/containers/0/volumeMounts/-",
+           "value": {"name": "local-repo", "mountPath": "{{repo_root}}", "readOnly": true}}
+        ]'
+        kubectl -n argocd rollout status deployment/argocd-repo-server
+    else
+        echo "argocd: argocd-repo-server already has the local-repo mount"
+    fi
+    sed "s#__REPO_ROOT__#{{repo_root}}#" "{{deploy_dir}}/argocd/environments/dev-k3s-local-app.yaml" \
+      | kubectl apply -n argocd -f -
+    echo "argocd: zero-to-kanban-dev-k3s-local applied -- syncing from your local working tree (file://{{repo_root}})" | lolcat
+    echo "  -> 'git commit' locally (no push needed); 'just refresh-local' to sync immediately"
+    just _argocd-info
+
+# Bootstrap Argo CD syncing from git -- the normal GitOps flow: commit + push to pick up edits
+up-gitops: _k3s-ready _argocd-base
+    kubectl apply -n argocd -f "{{deploy_dir}}/argocd/environments/dev-k3s-app.yaml"
+    @echo "argocd: zero-to-kanban-dev-k3s applied -- syncing from git (main), NOT your local working tree"
+    @echo "  -> local edits need a commit+push before Argo CD picks them up; 'just refresh-gitops' to sync immediately"
+    @just _argocd-info
+
+# Force an immediate sync of the local-source Application
+refresh-local:
+    kubectl -n argocd annotate application zero-to-kanban-dev-k3s-local argocd.argoproj.io/refresh=hard --overwrite
+
+# Force an immediate sync of the git-source Application
+refresh-gitops:
+    kubectl -n argocd annotate application zero-to-kanban-dev-k3s argocd.argoproj.io/refresh=hard --overwrite
+
+# (internal) fail with a clear message if the rootless k3s node isn't up yet
+_k3s-ready:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! kubectl get --raw='/readyz' >/dev/null 2>&1; then
+        echo "k3s: cluster not reachable at {{kubeconfig}} -- run 'nix develop ./deployment' first (or start k3s manually, see flake.nix)." >&2
+        exit 1
+    fi
+
+# (internal) install Argo CD itself if it isn't in the cluster yet
+_argocd-base:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! kubectl get namespace argocd >/dev/null 2>&1; then
+        echo "argocd: installing into the cluster (first run only)..."
+        kubectl create namespace argocd
+        # --server-side: the applicationsets.argoproj.io CRD's schema is big
+        # enough that client-side `kubectl apply`'s last-applied-configuration
+        # annotation blows past Kubernetes' 262144-byte annotation limit.
+        # Server-side apply tracks field ownership on the API server instead,
+        # so it doesn't need that annotation at all.
+        kubectl apply --server-side -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+        kubectl -n argocd wait --for=condition=available --timeout=300s deployment/argocd-server \
+          || echo "argocd: server not ready yet -- 'kubectl -n argocd get pods' to check" >&2
+    fi
+
+# (internal) print UI/password hints
+_argocd-info:
+    @echo -e "argocd admin password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\n" | lolcat
+    @echo "argocd UI: kubectl -n argocd port-forward svc/argocd-server 8081:443" | lolcat
+
+# Remove Argo CD (and everything it manages) from the cluster; the k3s node keeps running
+rm: _k3s-ready
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! kubectl get namespace argocd >/dev/null 2>&1; then
+        echo "argocd: namespace not present, nothing to remove"
+        exit 0
+    fi
+    # Delete the Applications first (and wait for it) so their managed
+    # resources get pruned by the controller before it disappears --
+    # otherwise deleting the argocd namespace outright would leave
+    # zero-to-kanban-dev-k3s's resources orphaned in the cluster.
+    kubectl -n argocd delete application zero-to-kanban-dev-k3s zero-to-kanban-dev-k3s-local \
+      --ignore-not-found --wait --timeout=120s
+    kubectl delete -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --ignore-not-found
+    kubectl delete namespace argocd --ignore-not-found
+    echo "argocd: removed from the cluster -- 'just up-local'/'just up-gitops' to reinstall"
+
+# Stop the rootless k3s node and delete all its state (Argo CD, Postgres data, everything)
+nuke:
     #!/usr/bin/env bash
     set -euo pipefail
     if systemctl --user is-active --quiet "{{unit}}.scope" 2>/dev/null; then

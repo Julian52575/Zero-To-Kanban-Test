@@ -1,0 +1,42 @@
+# Same as dev-k3s-app.yaml, but syncs from the local working tree (via a
+# file:// repoURL) instead of GitHub's main branch -- lets Argo CD pick up
+# commits before you push them.
+#
+# CAVEAT -- file:// only works if argocd-repo-server can actually see this
+# path. rootless k3s containers don't share the host mount namespace, so
+# the repo-server pod needs a hostPath bind mount for it first. Applied
+# together with the hostPath patch, so don't apply this file directly --
+# use `just up-local` (deployment/justfile), which substitutes __REPO_ROOT__
+# below for the repo's actual absolute path and applies the patch.
+#
+# Then just `git add -A && git commit` locally (no push needed) -- Argo CD
+# polls the local repo like any other git source and picks up new commits
+# on its normal refresh interval (or `just refresh-local` /
+# `kubectl -n argocd annotate application zero-to-kanban-dev-k3s-local
+# argocd.argoproj.io/refresh=hard --overwrite` to force it immediately).
+# Uncommitted working-tree changes are still not picked up -- Argo CD
+# always resolves targetRevision to a commit.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zero-to-kanban-dev-k3s-local
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: file://__REPO_ROOT__
+    targetRevision: main
+    path: deployment/helm/zero-to-kanban
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zero-to-kanban-dev-k3s
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

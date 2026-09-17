@@ -12,8 +12,9 @@
     {
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShellNoCC {
-          # Everything needed to run a rootless k3s node locally and point
-          # Argo CD at deployment/argocd + deployment/helm/zero-to-kanban.
+          # Everything needed to run a rootless k3s node locally. Argo CD
+          # setup itself is NOT done here -- see `just up-local` /
+          # `just up-gitops` in deployment/justfile once the node is up.
           # k3s ships its own Traefik (with the IngressRoute CRD our chart's
           # templates/ingressroute.yaml needs) -- nothing extra to install
           # for ingress.
@@ -22,6 +23,7 @@
             kubectl
             kubernetes-helm
             argocd
+            just
 
             # rootless k3s needs these for its own network/cgroup namespace
             # (see `k3s server --rootless`), on top of what the root
@@ -36,11 +38,13 @@
             util-linux # setsid -- detaches the background k3s server from the tty
           ];
 
-          # Auto-starts a rootless k3s node and (unless opted out) bootstraps
-          # Argo CD + the dev-k3s Application, so `nix develop --directory
-          # deployment/` alone gets you a cluster with the project already
-          # syncing. A second shell entering the same dir reuses the
-          # already-running node instead of starting a second one.
+          # Auto-starts a rootless k3s node, so `nix develop --directory
+          # deployment/` alone gets you a running cluster. A second shell
+          # entering the same dir reuses the already-running node instead of
+          # starting a second one. Once the node is ready, run
+          # `just up-local` (sync from your local working tree) or
+          # `just up-gitops` (sync from git, the normal Argo CD flow) to
+          # bootstrap Argo CD against it.
           #
           # k3s is launched via `systemd-run --user --scope`, NOT a plain
           # backgrounded process. On WSL (and possibly other setups where
@@ -60,7 +64,6 @@
           #
           # Env vars to opt out:
           #   K3S_NO_AUTOSTART=1  -- skip starting k3s entirely (manual mode)
-          #   K3S_NO_ARGOCD=1     -- start k3s but skip the Argo CD bootstrap
           shellHook = ''
             echo "deployment shell ready -- k3s $(k3s --version | head -n1)" | lolcat
 
@@ -92,13 +95,6 @@
             UNIT="zero-to-kanban-k3s"
             mkdir -p "$DATA_DIR"
 
-            # Echoes a command before running it, so the hook is never doing
-            # anything silently.
-            _run() {
-              echo "+ $*" | lolcat
-              "$@"
-            }
-
             _api_ready() {
               KUBECONFIG="$KUBECONFIG_PATH" kubectl get --raw='/readyz' >/dev/null 2>&1
             }
@@ -112,7 +108,7 @@
 
             owned=""
             if _unit_active; then
-              echo "k3s: reusing already-running node (systemd --user unit $UNIT.scope)" | lolcat
+              echo "k3s: reusing already-running node (systemd --user unit $UNIT.scope)"  | lolcat
             else
               echo "k3s: starting rootless node (first boot can take a minute)..."
               CPU_RANGE="0-$(( $(nproc) - 1 ))"
@@ -128,7 +124,7 @@
               if _wait_ready; then
                 echo "k3s: node ready (unit $UNIT.scope, stops when this shell exits; log: $DATA_DIR/k3s.log)" | lolcat
               else
-                echo "k3s: node did not become ready in time -- check $DATA_DIR/k3s.log" >&2
+                echo "k3s: node did not become ready in time -- check $DATA_DIR/k3s.log" >&2 | lolcat
               fi
               # Only the shell that started it tears it down.
               trap '
@@ -136,30 +132,6 @@
                   systemctl --user stop "'"$UNIT"'.scope" >/dev/null 2>&1 || true
                 fi
               ' EXIT
-            fi
-
-            if [ -n "''${K3S_NO_ARGOCD:-}" ]; then
-              echo "K3S_NO_ARGOCD set -- skipping Argo CD bootstrap. 'kubectl get nodes' to check the cluster."
-            elif _api_ready; then
-              if ! kubectl get namespace argocd >/dev/null 2>&1; then
-                echo "argocd: installing into the cluster (first run only)..."
-                _run kubectl create namespace argocd
-                # --server-side: the applicationsets.argoproj.io CRD's
-                # schema is big enough that client-side `kubectl apply`'s
-                # last-applied-configuration annotation blows past
-                # Kubernetes' 262144-byte annotation limit. Server-side
-                # apply tracks field ownership on the API server instead,
-                # so it doesn't need that annotation at all.
-                _run kubectl apply --server-side -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-                _run kubectl -n argocd wait --for=condition=available --timeout=300s deployment/argocd-server \
-                  || echo "argocd: server not ready yet -- 'kubectl -n argocd get pods' to check" >&2
-              fi
-              _run kubectl apply -n argocd -f "$DEPLOY_DIR/argocd/environments/dev-k3s-app.yaml" \
-                && echo "argocd: dev-k3s Application applied -- syncing from git (main), NOT your local working tree" \
-                || echo "argocd: could not apply dev-k3s-app.yaml yet (argocd-server may still be starting)" >&2
-              echo "  -> local edits to deployment/helm/zero-to-kanban/* need a commit+push before Argo CD picks them up."
-              echo "argocd UI: kubectl -n argocd port-forward svc/argocd-server 8081:443" | lolcat
-              echo "argocd admin password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d" | lolcat
             fi
           '';
         };
