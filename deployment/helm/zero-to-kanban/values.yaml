@@ -5,7 +5,7 @@ imagePullSecrets: []
 
 backend:
   image:
-    repository: ghcr.io/julian52575/zero-to-kanban-test-backend
+    repository: ghcr.io/julian52575/zero-to-kanban-backend
     tag: latest
     pullPolicy: IfNotPresent
   replicaCount: 1
@@ -20,7 +20,7 @@ backend:
 
 frontend:
   image:
-    repository: ghcr.io/julian52575/zero-to-kanban-test-frontend
+    repository: ghcr.io/julian52575/zero-to-kanban-frontend # closer to image name
     tag: latest
     pullPolicy: IfNotPresent
   replicaCount: 1

@@ -9,23 +9,28 @@
 # use `just up-local` (deployment/justfile), which substitutes __REPO_ROOT__
 # below for the repo's actual absolute path and applies the patch.
 #
+# targetRevision is __TARGET_REVISION__, substituted by `just up-local` from
+# $GIT_BRANCH (exported by flake.nix's shellHook to your current branch) --
+# so this tracks whatever branch you're on, not `main`. Sync a dev branch
+# without ever committing to main.
+#
 # Then just `git add -A && git commit` locally (no push needed) -- Argo CD
 # polls the local repo like any other git source and picks up new commits
 # on its normal refresh interval (or `just refresh-local` /
-# `kubectl -n argocd annotate application zero-to-kanban-dev-k3s-local
+# `kubectl -n argocd annotate application ztk-dev-k3s-local
 # argocd.argoproj.io/refresh=hard --overwrite` to force it immediately).
 # Uncommitted working-tree changes are still not picked up -- Argo CD
 # always resolves targetRevision to a commit.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: zero-to-kanban-dev-k3s-local
+  name: ztk-dev-k3s-local
   namespace: argocd
 spec:
   project: default
   source:
     repoURL: file://__REPO_ROOT__
-    targetRevision: main
+    targetRevision: __TARGET_REVISION__
     path: deployment/helm/zero-to-kanban
     helm:
       valueFiles:
@@ -33,7 +38,7 @@ spec:
         - values-dev.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: zero-to-kanban-dev-k3s
+    namespace: ztk-dev-k3s
   syncPolicy:
     automated:
       prune: true

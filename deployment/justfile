@@ -16,6 +16,7 @@ export KUBECONFIG := kubeconfig
 up-local: _k3s-ready _argocd-base
     #!/usr/bin/env bash
     set -euo pipefail
+    branch="{{env_var_or_default("GIT_BRANCH", "main")}}"
     if ! kubectl -n argocd get deployment argocd-repo-server -o jsonpath='{.spec.template.spec.volumes[?(@.name=="local-repo")].name}' | grep -q local-repo; then
         echo "argocd: bind-mounting {{repo_root}} into argocd-repo-server (one-time)..."
         kubectl -n argocd patch deployment argocd-repo-server --type=json -p '[
@@ -28,26 +29,27 @@ up-local: _k3s-ready _argocd-base
     else
         echo "argocd: argocd-repo-server already has the local-repo mount"
     fi
-    sed "s#__REPO_ROOT__#{{repo_root}}#" "{{deploy_dir}}/argocd/environments/dev-k3s-local-app.yaml" \
+    sed -e "s#__REPO_ROOT__#{{repo_root}}#" -e "s#__TARGET_REVISION__#$branch#" \
+      "{{deploy_dir}}/argocd/environments/dev-k3s-local-app.yaml" \
       | kubectl apply -n argocd -f -
-    echo "argocd: zero-to-kanban-dev-k3s-local applied -- syncing from your local working tree (file://{{repo_root}})" | lolcat
-    echo "  -> 'git commit' locally (no push needed); 'just refresh-local' to sync immediately"
+    echo "argocd: ztk-dev-k3s-local applied -- syncing from your local working tree (file://{{repo_root}}, branch $branch)" | lolcat
+    echo "  -> 'git commit' locally on $branch (no push needed); 'just refresh-local' to sync immediately"
     just _argocd-info
 
 # Bootstrap Argo CD syncing from git -- the normal GitOps flow: commit + push to pick up edits
 up-gitops: _k3s-ready _argocd-base
     kubectl apply -n argocd -f "{{deploy_dir}}/argocd/environments/dev-k3s-app.yaml"
-    @echo "argocd: zero-to-kanban-dev-k3s applied -- syncing from git (main), NOT your local working tree"
+    @echo "argocd: ztk-dev-k3s applied -- syncing from git (main), NOT your local working tree"
     @echo "  -> local edits need a commit+push before Argo CD picks them up; 'just refresh-gitops' to sync immediately"
     @just _argocd-info
 
 # Force an immediate sync of the local-source Application
 refresh-local:
-    kubectl -n argocd annotate application zero-to-kanban-dev-k3s-local argocd.argoproj.io/refresh=hard --overwrite
+    kubectl -n argocd annotate application ztk-dev-k3s-local argocd.argoproj.io/refresh=hard --overwrite
 
 # Force an immediate sync of the git-source Application
 refresh-gitops:
-    kubectl -n argocd annotate application zero-to-kanban-dev-k3s argocd.argoproj.io/refresh=hard --overwrite
+    kubectl -n argocd annotate application ztk-dev-k3s argocd.argoproj.io/refresh=hard --overwrite
 
 # (internal) fail with a clear message if the rootless k3s node isn't up yet
 _k3s-ready:
@@ -92,8 +94,8 @@ rm: _k3s-ready
     # Delete the Applications first (and wait for it) so their managed
     # resources get pruned by the controller before it disappears --
     # otherwise deleting the argocd namespace outright would leave
-    # zero-to-kanban-dev-k3s's resources orphaned in the cluster.
-    kubectl -n argocd delete application zero-to-kanban-dev-k3s zero-to-kanban-dev-k3s-local \
+    # ztk-dev-k3s's resources orphaned in the cluster.
+    kubectl -n argocd delete application ztk-dev-k3s ztk-dev-k3s-local \
       --ignore-not-found --wait --timeout=120s
     kubectl delete -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --ignore-not-found
     kubectl delete namespace argocd --ignore-not-found

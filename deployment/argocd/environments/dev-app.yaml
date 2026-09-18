@@ -1,12 +1,12 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: zero-to-kanban-test-dev
+  name: Zero-To-Kanban-dev
   namespace: argocd
 spec:
   project: default
   source:
-    repoURL: https://github.com/julian52575/Zero-To-Kanban-Test.git
+    repoURL: https://github.com/julian52575/Zero-To-Kanban.git
     targetRevision: main
     path: deployment/helm/zero-to-kanban
     helm:
@@ -15,7 +15,7 @@ spec:
         - values-dev.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: zero-to-kanban-test-dev
+    namespace: Zero-To-Kanban-dev
   syncPolicy:
     automated:
       prune: true

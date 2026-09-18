@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/julian52575/Zero-To-Kanban-Test.git
+    repoURL: https://github.com/julian52575/Zero-To-Kanban.git
     targetRevision: main
     path: deployment/helm/zero-to-kanban
     helm:

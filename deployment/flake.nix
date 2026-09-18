@@ -66,6 +66,7 @@
           #   K3S_NO_AUTOSTART=1  -- skip starting k3s entirely (manual mode)
           shellHook = ''
             echo "deployment shell ready -- k3s $(k3s --version | head -n1)" | lolcat
+            echo "GIT_BRANCH=$GIT_BRANCH (used by 'just up-local' as the Argo CD targetRevision)" | lolcat
 
             if [ -n "''${K3S_NO_AUTOSTART:-}" ]; then
               echo "K3S_NO_AUTOSTART set -- start it yourself (see the comment above shellHook"
@@ -88,6 +89,12 @@
               echo "k3s: can't locate the deployment/ directory from \$PWD ($PWD) -- run this from the repo root or deployment/ itself." >&2
               return 2>/dev/null || exit 1
             fi
+
+            # Current branch, exported so `just up-local` can point the
+            # file:// Argo CD Application at it instead of hardcoding
+            # `main` -- lets you sync a dev branch without committing to
+            # main. Falls back to "main" if HEAD is detached.
+            export GIT_BRANCH="$(git -C "$DEPLOY_DIR" symbolic-ref --short -q HEAD || echo main)"
 
             KUBECONFIG_PATH="$DEPLOY_DIR/k3s.yaml"
             export KUBECONFIG="$KUBECONFIG_PATH"

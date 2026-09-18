@@ -1,0 +1,186 @@
+name: bump-helm-chart
+
+# Closes the loop after a release image lands on ghcr.io:
+#   gh release 2.1.0 -> ghcr.io/.../zero-to-kanban-{backend,frontend}:2.1.0 -> helm chart bumped to 2.1.0
+#
+# Runs only after release-to-container-registry (release-to-ghcr.yml) finishes
+# successfully for an actual GitHub Release (not a manual/test
+# workflow_dispatch build), so the images referenced by the new tag are
+# guaranteed to already exist on ghcr.io.
+#
+# 1. bump-chart:  writes the new tag into values.yaml / Chart.yaml
+# 2. smoke-test:  actually deploys the bumped chart into a real k3s node
+#                 (deployment/flake.nix -- the same rootless k3s + helm
+#                 tooling used for local dev) and waits for it to go Ready
+# 3. open-pr:     only runs if the smoke test passed; opens a PR rather than
+#                 pushing to main directly, mirroring the release-please
+#                 PR-then-merge pattern already used in this repo
+
+on:
+  workflow_run:
+    workflows: ["release-to-container-registry"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: bump-helm-chart-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  bump-chart:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'release'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      # For a `release` triggered run, head_branch is the release tag itself
+      # (no "v" prefix, matching release-please's tagging scheme).
+      - name: Resolve release tag
+        id: tag
+        run: echo "tag=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+
+      # ubuntu-latest ships yq (mikefarah/yq) preinstalled -- no extra install step.
+      - name: Bump chart image tags and appVersion
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          yq -i ".backend.image.tag = strenv(TAG)" deployment/helm/zero-to-kanban/values.yaml
+          yq -i ".frontend.image.tag = strenv(TAG)" deployment/helm/zero-to-kanban/values.yaml
+          yq -i ".appVersion = strenv(TAG)" deployment/helm/zero-to-kanban/Chart.yaml
+
+      - name: Upload bumped chart files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bumped-chart-files
+          path: |
+            deployment/helm/zero-to-kanban/values.yaml
+            deployment/helm/zero-to-kanban/Chart.yaml
+          retention-days: 1
+
+  smoke-test:
+    needs: bump-chart
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+
+      - name: Overlay bumped chart files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: bumped-chart-files
+          path: .
+
+      # Reuses this repo's own Nix setup (pin + Nix store cache), the same
+      # one ci.yml uses -- one place to bump the nix-installer-action pin
+      # instead of a second copy drifting out of sync here.
+      - uses: ./.github/actions/setup-devshell
+        with:
+          warm: "false" # we build deployment/flake.nix below, not the root one
+
+      # Everything that touches the cluster has to run inside ONE
+      # `nix develop --command` invocation: flake.nix's shellHook starts the
+      # rootless k3s node via a systemd --user scope and registers a trap
+      # that STOPS it when that shell exits. Splitting this across multiple
+      # steps (each its own `nix develop --command`) would tear the node
+      # down again right after the first step.
+      - name: Deploy bumped chart into k3s and smoke test
+        env:
+          TAG: ${{ needs.bump-chart.outputs.tag }}
+        run: |
+          nix develop ./deployment --command bash -euo pipefail -c '
+            kubectl create namespace ztk-smoke
+
+            helm dependency build deployment/helm/zero-to-kanban
+
+            deploy_ok=1
+            helm upgrade --install ztk-smoke deployment/helm/zero-to-kanban \
+              --namespace ztk-smoke \
+              --wait --timeout 5m \
+              || deploy_ok=0
+
+            {
+              echo "## Helm smoke test -- tag \`$TAG\`"
+              echo
+              if [ "$deploy_ok" = "1" ]; then
+                echo "Deployed cleanly into a real k3s node and reached Ready."
+              else
+                echo "**Deploy did not reach Ready within the timeout.**"
+              fi
+              echo
+              echo "| Workload | Image | Ready |"
+              echo "| --- | --- | --- |"
+              for component in backend frontend; do
+                dep="$(kubectl -n ztk-smoke get deploy -l app.kubernetes.io/component=$component -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || true)"
+                if [ -n "$dep" ]; then
+                  image="$(kubectl -n ztk-smoke get deploy "$dep" -o jsonpath="{.spec.template.spec.containers[0].image}" 2>/dev/null || echo "?")"
+                  ready="$(kubectl -n ztk-smoke get deploy "$dep" -o jsonpath="{.status.readyReplicas}/{.status.replicas}" 2>/dev/null || echo "?")"
+                else
+                  image="?"; ready="?"
+                fi
+                echo "| $component | \`$image\` | \`$ready\` |"
+              done
+              echo
+              echo "<details><summary>Pods</summary>"
+              echo
+              echo "\`\`\`"
+              kubectl -n ztk-smoke get pods -o wide 2>/dev/null || echo "(unavailable)"
+              echo "\`\`\`"
+              echo "</details>"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            if [ "$deploy_ok" != "1" ]; then
+              echo "::group::smoke-test diagnostics"
+              kubectl -n ztk-smoke get pods -o wide || true
+              kubectl -n ztk-smoke describe pods || true
+              kubectl -n ztk-smoke logs -l app.kubernetes.io/component=backend --all-containers --tail=200 || true
+              kubectl -n ztk-smoke logs -l app.kubernetes.io/component=frontend --all-containers --tail=200 || true
+              echo "::endgroup::"
+              exit 1
+            fi
+          '
+
+  open-pr:
+    needs: [bump-chart, smoke-test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+
+      - name: Overlay bumped chart files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: bumped-chart-files
+          path: .
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(helm): bump image tag to ${{ needs.bump-chart.outputs.tag }}"
+          branch: bump-helm-chart-${{ needs.bump-chart.outputs.tag }}
+          delete-branch: true
+          title: "chore(helm): bump image tag to ${{ needs.bump-chart.outputs.tag }}"
+          body: |
+            Bumps `backend.image.tag` / `frontend.image.tag` in `values.yaml` and
+            `appVersion` in `Chart.yaml` to `${{ needs.bump-chart.outputs.tag }}`,
+            matching the image just published to ghcr.io by release
+            `${{ needs.bump-chart.outputs.tag }}`.
+
+            Verified by the `smoke-test` job: the bumped chart was deployed into a
+            real k3s node (rootless, via `deployment/flake.nix`) and reached Ready.
+          labels: helm,automated

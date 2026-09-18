@@ -8,14 +8,14 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: zero-to-kanban-test-root
+  name: Zero-To-Kanban-root
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
-    repoURL: https://github.com/julian52575/Zero-To-Kanban-Test.git
+    repoURL: https://github.com/julian52575/Zero-To-Kanban.git
     targetRevision: main
     path: deployment/argocd/environments
     directory:
