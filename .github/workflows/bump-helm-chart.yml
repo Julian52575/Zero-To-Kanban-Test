@@ -90,6 +90,13 @@ jobs:
         with:
           warm: "false" # we build deployment/flake.nix below, not the root one
 
+      # Ubuntu 24.04 runners block unprivileged user namespaces for binaries
+      # without an AppArmor profile (which includes everything from the Nix
+      # store), so rootlesskit dies with "fork/exec /proc/self/exe: operation
+      # not permitted". This is a throwaway VM -- lift the restriction.
+      - name: Allow unprivileged user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       # Everything that touches the cluster has to run inside ONE
       # `nix develop --command` invocation: flake.nix's shellHook starts the
       # rootless k3s node via a systemd --user scope and registers a trap
