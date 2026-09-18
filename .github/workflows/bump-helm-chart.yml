@@ -10,8 +10,8 @@ name: bump-helm-chart
 #
 # 1. bump-chart:  writes the new tag into values.yaml / Chart.yaml
 # 2. smoke-test:  actually deploys the bumped chart into a real k3s node
-#                 (deployment/flake.nix -- the same rootless k3s + helm
-#                 tooling used for local dev) and waits for it to go Ready
+#                 (deployment/flake.nix -- the same k3s + helm
+#                 tooling as local dev, but k3s runs as root in CI) and waits for it to go Ready
 # 3. open-pr:     only runs if the smoke test passed; opens a PR rather than
 #                 pushing to main directly, mirroring the release-please
 #                 PR-then-merge pattern already used in this repo
@@ -90,24 +90,36 @@ jobs:
         with:
           warm: "false" # we build deployment/flake.nix below, not the root one
 
-      # Ubuntu 24.04 runners block unprivileged user namespaces for binaries
-      # without an AppArmor profile (which includes everything from the Nix
-      # store), so rootlesskit dies with "fork/exec /proc/self/exe: operation
-      # not permitted". This is a throwaway VM -- lift the restriction.
-      - name: Allow unprivileged user namespaces
-        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-
-      # Everything that touches the cluster has to run inside ONE
-      # `nix develop --command` invocation: flake.nix's shellHook starts the
-      # rootless k3s node via a systemd --user scope and registers a trap
-      # that STOPS it when that shell exits. Splitting this across multiple
-      # steps (each its own `nix develop --command`) would tear the node
-      # down again right after the first step.
+      # CI only: k3s runs as root on the (throwaway) runner VM. The rootless
+      # mode flake.nix's shellHook uses for local dev needs user namespaces,
+      # a delegated cgroup v2 tree and a systemd --user manager, none of which
+      # a stock runner provides. K3S_NO_AUTOSTART=1 makes the shellHook skip
+      # its rootless autostart so we can start k3s ourselves.
+      #
+      # Everything that touches the cluster runs inside ONE
+      # `nix develop --command` so the Nix-pinned k3s/kubectl/helm are on PATH.
       - name: Deploy bumped chart into k3s and smoke test
         env:
           TAG: ${{ needs.bump-chart.outputs.tag }}
+          K3S_NO_AUTOSTART: "1"
+          K3S_LOG: ${{ runner.temp }}/k3s.log
         run: |
           nix develop ./deployment --command bash -euo pipefail -c '
+            export KUBECONFIG="$PWD/deployment/k3s.yaml"
+            sudo env "PATH=$PATH" k3s server \
+              --write-kubeconfig "$KUBECONFIG" --write-kubeconfig-mode 644 \
+              >"$K3S_LOG" 2>&1 &
+
+            ready=""
+            for _ in $(seq 120); do
+              if kubectl get --raw=/readyz >/dev/null 2>&1; then ready=1; break; fi
+              sleep 1
+            done
+            if [ -z "$ready" ]; then
+              echo "k3s did not become ready within 120s" >&2
+              exit 1
+            fi
+
             kubectl create namespace ztk-smoke
 
             helm dependency build deployment/helm/zero-to-kanban
@@ -159,14 +171,13 @@ jobs:
             fi
           '
 
-      # The k3s node's stdout/stderr (including any systemd-run failure) goes
-      # to this file, and nothing else surfaces it when the node never gets
-      # ready. The file outlives the nix shell, so read it after the fact.
+      # The k3s node's stdout/stderr goes to this file, and nothing else
+      # surfaces it when the node never gets ready.
       - name: Print k3s log
         if: failure()
         run: |
           echo "::group::k3s.log"
-          cat deployment/.k3s/k3s.log || echo "(no k3s.log found)"
+          cat "${{ runner.temp }}/k3s.log" || echo "(no k3s.log found)"
           echo "::endgroup::"
 
   open-pr:
@@ -199,5 +210,5 @@ jobs:
             `${{ needs.bump-chart.outputs.tag }}`.
 
             Verified by the `smoke-test` job: the bumped chart was deployed into a
-            real k3s node (rootless, via `deployment/flake.nix`) and reached Ready.
+            real k3s node (root, via `deployment/flake.nix` tooling) and reached Ready.
           labels: helm,automated
