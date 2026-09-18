@@ -152,6 +152,16 @@ jobs:
             fi
           '
 
+      # The k3s node's stdout/stderr (including any systemd-run failure) goes
+      # to this file, and nothing else surfaces it when the node never gets
+      # ready. The file outlives the nix shell, so read it after the fact.
+      - name: Print k3s log
+        if: failure()
+        run: |
+          echo "::group::k3s.log"
+          cat deployment/.k3s/k3s.log || echo "(no k3s.log found)"
+          echo "::endgroup::"
+
   open-pr:
     needs: [bump-chart, smoke-test]
     runs-on: ubuntu-latest
