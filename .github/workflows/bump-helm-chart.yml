@@ -81,7 +81,10 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: bumped-chart-files
-          path: .
+          # upload-artifact roots the zip at the files' common ancestor, so the
+          # artifact holds bare values.yaml / Chart.yaml -- extract them back
+          # into the chart dir (path: . would drop them in the repo root).
+          path: deployment/helm/zero-to-kanban
 
       # Reuses this repo's own Nix setup (pin + Nix store cache), the same
       # one ci.yml uses -- one place to bump the nix-installer-action pin
@@ -141,6 +144,16 @@ jobs:
               --namespace ztk-smoke \
               --wait --timeout 5m \
               || deploy_ok=0
+
+            # Guard against testing the wrong thing: the deployed images must
+            # carry the release tag (a missed overlay leaves the chart on :latest).
+            for component in backend frontend; do
+              img="$(kubectl -n ztk-smoke get deploy -l app.kubernetes.io/component=$component -o jsonpath="{.items[0].spec.template.spec.containers[0].image}" 2>/dev/null || true)"
+              case "$img" in
+                *":$TAG") ;;
+                *) echo "::error::$component runs \"$img\", expected tag $TAG"; deploy_ok=0 ;;
+              esac
+            done
 
             {
               echo "## Helm smoke test -- tag \`$TAG\`"
@@ -205,7 +218,10 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: bumped-chart-files
-          path: .
+          # upload-artifact roots the zip at the files' common ancestor, so the
+          # artifact holds bare values.yaml / Chart.yaml -- extract them back
+          # into the chart dir (path: . would drop them in the repo root).
+          path: deployment/helm/zero-to-kanban
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
