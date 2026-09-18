@@ -2,11 +2,10 @@
 # Environment-specific overrides live in values-dev.yaml / values-prod.yaml.
 
 imagePullSecrets: []
-
 backend:
   image:
     repository: ghcr.io/julian52575/zero-to-kanban-test-backend
-    tag: latest
+    tag: 1.3.2
     pullPolicy: IfNotPresent
   replicaCount: 1
   containerPort: 3000
@@ -17,11 +16,10 @@ backend:
     limits:
       cpu: 500m
       memory: 256Mi
-
 frontend:
   image:
     repository: ghcr.io/julian52575/zero-to-kanban-test-frontend # closer to image name
-    tag: latest
+    tag: 1.3.2
     pullPolicy: IfNotPresent
   replicaCount: 1
   containerPort: 5173
@@ -32,7 +30,6 @@ frontend:
     limits:
       cpu: 250m
       memory: 128Mi
-
 ingress:
   enabled: true
   # entryPoints on the Traefik router (matches the `web` entrypoint the
@@ -42,7 +39,6 @@ ingress:
   tls:
     enabled: false
     secretName: ""
-
 # Bitnami postgresql subchart config. See:
 # https://github.com/bitnami/charts/tree/main/bitnami/postgresql
 # Bitnami stopped publishing free images to docker.io/bitnami (tags 404), so
