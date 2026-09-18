@@ -3010,7 +3010,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/persistence/index.js",
+                      "uri": "backend/src/index.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 1
                     }
@@ -3039,7 +3039,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/routes/addItem.js",
+                      "uri": "backend/src/persistence/index.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 2
                     }
@@ -3068,7 +3068,7 @@
                 {
                   "physicalLocation": {
                     "artifactLocation": {
-                      "uri": "backend/src/index.js",
+                      "uri": "backend/src/routes/addItem.js",
                       "uriBaseId": "%SRCROOT%",
                       "index": 3
                     }
@@ -3244,7 +3244,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/index.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 3
+                      "index": 1
                     }
                   }
                 }
@@ -3270,7 +3270,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/persistence/index.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 1
+                      "index": 2
                     }
                   }
                 }
@@ -3296,7 +3296,7 @@
                     "artifactLocation": {
                       "uri": "backend/src/routes/addItem.js",
                       "uriBaseId": "%SRCROOT%",
-                      "index": 2
+                      "index": 3
                     }
                   }
                 }
@@ -3398,7 +3398,7 @@
                 "text": ""
               },
               "level": "none",
-              "timeUtc": "2026-09-18T17:00:57.449Z",
+              "timeUtc": "2026-09-18T17:10:34.959Z",
               "descriptor": {
                 "id": "codeql-action/overlay-disabled",
                 "index": 1
@@ -3427,21 +3427,21 @@
         },
         {
           "location": {
-            "uri": "backend/src/persistence/index.js",
+            "uri": "backend/src/index.js",
             "uriBaseId": "%SRCROOT%",
             "index": 1
           }
         },
         {
           "location": {
-            "uri": "backend/src/routes/addItem.js",
+            "uri": "backend/src/persistence/index.js",
             "uriBaseId": "%SRCROOT%",
             "index": 2
           }
         },
         {
           "location": {
-            "uri": "backend/src/index.js",
+            "uri": "backend/src/routes/addItem.js",
             "uriBaseId": "%SRCROOT%",
             "index": 3
           }
@@ -3523,7 +3523,7 @@
         "codeqlConfigSummary": {
           "disableDefaultQueries": false
         },
-        "jobRunUuid": "e78295c3-1495-4ed9-9caf-9813a43c040b"
+        "jobRunUuid": "1531f2f0-5e26-44b4-97dd-e24d90c59cd5"
       }
     }
   ]
