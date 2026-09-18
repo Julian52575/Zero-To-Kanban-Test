@@ -5,7 +5,7 @@ imagePullSecrets: []
 
 backend:
   image:
-    repository: ghcr.io/julian52575/zero-to-kanban-backend
+    repository: ghcr.io/julian52575/zero-to-kanban-test-backend
     tag: latest
     pullPolicy: IfNotPresent
   replicaCount: 1
@@ -20,7 +20,7 @@ backend:
 
 frontend:
   image:
-    repository: ghcr.io/julian52575/zero-to-kanban-frontend # closer to image name
+    repository: ghcr.io/julian52575/zero-to-kanban-test-frontend # closer to image name
     tag: latest
     pullPolicy: IfNotPresent
   replicaCount: 1
@@ -45,8 +45,16 @@ ingress:
 
 # Bitnami postgresql subchart config. See:
 # https://github.com/bitnami/charts/tree/main/bitnami/postgresql
+# Bitnami stopped publishing free images to docker.io/bitnami (tags 404), so
+# pull the frozen copies from bitnamilegacy. The subchart refuses a non-default
+# image repository unless global.security.allowInsecureImages is set.
+global:
+  security:
+    allowInsecureImages: true
 postgresql:
   enabled: true
+  image:
+    repository: bitnamilegacy/postgresql
   auth:
     username: todo
     database: todo

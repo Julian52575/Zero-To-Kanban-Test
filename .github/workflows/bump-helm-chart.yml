@@ -120,8 +120,20 @@ jobs:
               exit 1
             fi
 
+            # k3s installs Traefik (and its CRDs, which our IngressRoute
+            # template needs) asynchronously after the API is up. Without this
+            # wait, helm fails with: no matches for kind "IngressRoute".
+            for _ in $(seq 180); do
+              kubectl get crd ingressroutes.traefik.io >/dev/null 2>&1 && break
+              sleep 1
+            done
+            kubectl wait --for=condition=Established crd/ingressroutes.traefik.io --timeout=60s
+
             kubectl create namespace ztk-smoke
 
+            # `helm dependency build` needs every repo in Chart.yaml registered
+            # locally; a fresh runner has none.
+            helm repo add bitnami https://charts.bitnami.com/bitnami --force-update
             helm dependency build deployment/helm/zero-to-kanban
 
             deploy_ok=1
