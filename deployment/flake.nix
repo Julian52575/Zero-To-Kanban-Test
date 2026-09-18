@@ -74,8 +74,10 @@
               echo "  systemd-run --user --unit=zero-to-kanban-k3s --scope --collect \\"
               echo "    -p CPUWeight=100 -p AllowedCPUs=0-\$((\$(nproc)-1)) -p IOWeight=100 \\"
               echo "    -- k3s server --rootless --write-kubeconfig ./k3s.yaml --write-kubeconfig-mode 644 --data-dir ./.k3s"
-              return 2>/dev/null || exit 0
-            fi
+            else
+            # (if/else rather than an early `return`/`exit`: under `nix develop
+            # --command` the hook runs at top level, where `return` fails and
+            # `exit 0` would kill the shell before the command ever runs.)
 
             # `nix develop --directory deployment/` (or `nix develop
             # ./deployment` from the repo root) does NOT cd you into
@@ -140,6 +142,7 @@
                 fi
               ' EXIT
             fi
+            fi # K3S_NO_AUTOSTART
           '';
         };
       });

@@ -202,7 +202,7 @@ jobs:
           commit-message: "chore(helm): bump image tag to ${{ needs.bump-chart.outputs.tag }}"
           branch: bump-helm-chart-${{ needs.bump-chart.outputs.tag }}
           delete-branch: true
-          title: "chore(helm): bump image tag to ${{ needs.bump-chart.outputs.tag }}"
+          title: "chore(helm): 🤖 bump image tag to ${{ needs.bump-chart.outputs.tag }}"
           body: |
             Bumps `backend.image.tag` / `frontend.image.tag` in `values.yaml` and
             `appVersion` in `Chart.yaml` to `${{ needs.bump-chart.outputs.tag }}`,
@@ -211,4 +211,6 @@ jobs:
 
             Verified by the `smoke-test` job: the bumped chart was deployed into a
             real k3s node (root, via `deployment/flake.nix` tooling) and reached Ready.
+
+            Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           labels: helm,automated
