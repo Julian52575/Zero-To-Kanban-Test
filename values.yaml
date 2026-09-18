@@ -1,0 +1,73 @@
+# Default values for the zero-to-kanban chart.
+# Environment-specific overrides live in values-dev.yaml / values-prod.yaml.
+
+imagePullSecrets: []
+backend:
+  image:
+    repository: ghcr.io/julian52575/zero-to-kanban-test-backend
+    tag: 1.3.1
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  containerPort: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+frontend:
+  image:
+    repository: ghcr.io/julian52575/zero-to-kanban-test-frontend # closer to image name
+    tag: 1.3.1
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  containerPort: 5173
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+ingress:
+  enabled: true
+  # entryPoints on the Traefik router (matches the `web` entrypoint the
+  # dev-mode Traefik proxy in docker-compose.yml listens on).
+  entryPoints:
+    - web
+  tls:
+    enabled: false
+    secretName: ""
+# Bitnami postgresql subchart config. See:
+# https://github.com/bitnami/charts/tree/main/bitnami/postgresql
+# Bitnami stopped publishing free images to docker.io/bitnami (tags 404), so
+# pull the frozen copies from bitnamilegacy. The subchart refuses a non-default
+# image repository unless global.security.allowInsecureImages is set.
+global:
+  security:
+    allowInsecureImages: true
+postgresql:
+  enabled: true
+  image:
+    repository: bitnamilegacy/postgresql
+  auth:
+    username: todo
+    database: todo
+    # Plaintext fallback password, only used when existingSecret is unset
+    # below (fine for disposable dev environments; never set this in
+    # values-prod.yaml -- use existingSecret there instead).
+    password: todo
+    # Name of a pre-created Secret holding the Postgres password. When set,
+    # `password` above is ignored and the bitnami subchart won't generate
+    # its own Secret. Create it out-of-band, e.g.:
+    #   kubectl create secret generic zero-to-kanban-prod-postgresql \
+    #     --namespace zero-to-kanban-prod \
+    #     --from-literal=password='<strong-password>'
+    existingSecret: ""
+    secretKeys:
+      userPasswordKey: password
+  primary:
+    persistence:
+      enabled: true
+      size: 1Gi
